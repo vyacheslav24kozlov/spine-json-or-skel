@@ -1,11 +1,10 @@
-# Angular specific
+# IDE and Vite specific
 /dist/
 /out-tsc/
 /tmp/
 /coverage/
 /e2e/test-output/
-/.angular/
-.angular/
+/.idea/
 
 # Node modules and dependency files
 /node_modules/
@@ -15,8 +14,7 @@
 # Environment files
 /.env
 
-# Angular CLI and build artefacts
-/.angular-cli.json
+# CLI and build artefacts
 /.ng/
 
 # TypeScript cache

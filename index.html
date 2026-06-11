@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spine JSON vs SKEL Benchmark</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Spine JSON vs SKEL Benchmark</h1>
+        <p>
+          Сравнение загрузки и воспроизведения 100 копий
+          <code>animation_minor</code>
+        </p>
+      </header>
+
+      <section class="controls">
+        <label>
+          Копий:
+          <input id="instance-count" type="number" min="1" max="500" value="100" />
+        </label>
+        <label>
+          Анимация:
+          <select id="animation-name">
+            <option value="idle">idle</option>
+            <option value="win">win</option>
+            <option value="dropped">dropped</option>
+            <option value="idle_collect">idle_collect</option>
+            <option value="win_bonus_game">win_bonus_game</option>
+          </select>
+        </label>
+        <label>
+          Длительность playback (с):
+          <input id="playback-duration" type="number" min="1" max="30" value="5" />
+        </label>
+        <button id="run-benchmark" type="button">Запустить benchmark</button>
+      </section>
+
+      <section class="layout">
+        <div class="panel">
+          <h2>Результаты</h2>
+          <div id="status" class="status">Готов к запуску</div>
+          <div id="results"></div>
+        </div>
+        <div class="panel canvas-panel">
+          <h2>Визуализация</h2>
+          <canvas id="canvas"></canvas>
+        </div>
+      </section>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

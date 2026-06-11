@@ -1,0 +1,23 @@
+{
+  "name": "spine-json-or-skel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "benchmark:parse": "tsx src/parse-cli.ts",
+    "benchmark": "npm run benchmark:parse"
+  },
+  "dependencies": {
+    "@esotericsoftware/spine-core": "4.2.43",
+    "@esotericsoftware/spine-webgl": "4.2.43"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}
