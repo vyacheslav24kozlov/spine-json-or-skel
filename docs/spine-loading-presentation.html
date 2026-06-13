@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spine: загрузка ассетов и parseSkeletonData</title>
+    <style>
+      :root {
+        --bg: #11151c;
+        --panel: #1a2130;
+        --panel-2: #0f141d;
+        --text: #e8edf5;
+        --muted: #9aa7bd;
+        --accent: #3b82f6;
+        --accent-2: #34d399;
+        --warn: #fbbf24;
+        --border: #334055;
+        --code: #dbeafe;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.55;
+      }
+
+      .deck {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px 24px 120px;
+      }
+
+      .toolbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        padding: 16px;
+        background: rgba(17, 21, 28, 0.92);
+        border-top: 1px solid var(--border);
+        backdrop-filter: blur(8px);
+      }
+
+      .toolbar button {
+        font: inherit;
+        padding: 10px 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      .toolbar button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+      }
+
+      .slide-counter {
+        align-self: center;
+        color: var(--muted);
+        min-width: 80px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .slide {
+        display: none;
+        animation: fade 0.25s ease;
+      }
+
+      .slide.active {
+        display: block;
+      }
+
+      @keyframes fade {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+      }
+
+      h1 {
+        font-size: 2rem;
+        margin: 0 0 12px;
+      }
+
+      h2 {
+        font-size: 1.5rem;
+        margin: 0 0 16px;
+        color: var(--accent-2);
+      }
+
+      h3 {
+        font-size: 1.05rem;
+        margin: 20px 0 8px;
+      }
+
+      p,
+      li {
+        color: #c9d4e6;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        font-size: 1.05rem;
+        margin-bottom: 24px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 18px;
+        margin: 16px 0;
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #102033;
+        border: 1px solid #23486b;
+        color: #93c5fd;
+        font-size: 0.85rem;
+        margin-right: 8px;
+        margin-bottom: 8px;
+      }
+
+      pre {
+        margin: 0;
+        padding: 14px 16px;
+        border-radius: 10px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        overflow: auto;
+        font-size: 0.88rem;
+        line-height: 1.45;
+      }
+
+      code {
+        font-family: Consolas, "Courier New", monospace;
+        color: var(--code);
+      }
+
+      .flow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin: 16px 0;
+      }
+
+      .flow-step {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        min-width: 130px;
+      }
+
+      .flow-step strong {
+        display: block;
+        margin-bottom: 4px;
+        color: white;
+      }
+
+      .flow-step span {
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .arrow {
+        color: var(--accent);
+        font-size: 1.4rem;
+        font-weight: bold;
+      }
+
+      .compare {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .compare .card h3 {
+        margin-top: 0;
+      }
+
+      .highlight {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25);
+      }
+
+      .note {
+        border-left: 4px solid var(--warn);
+        padding: 10px 14px;
+        background: rgba(251, 191, 36, 0.08);
+        border-radius: 0 8px 8px 0;
+        color: #fde68a;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 10px 12px;
+        text-align: left;
+      }
+
+      th {
+        background: var(--panel-2);
+        color: var(--muted);
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+
+      @media (max-width: 860px) {
+        .grid-2,
+        .compare {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="deck">
+      <section class="slide active" data-slide="1">
+        <h1>Загрузка Spine-ассетов</h1>
+        <p class="subtitle">
+          Как <code>loadSpineAssets</code> и <code>parseSkeletonData</code> из
+          <code>src/shared/spineLoader.ts</code> превращают файлы в
+          <code>SkeletonData</code>
+        </p>
+        <div class="card">
+          <span class="tag">spine-json-or-skel</span>
+          <span class="tag">Spine 4.2.43</span>
+          <span class="tag">@esotericsoftware/spine-core</span>
+          <p>
+            Проект сравнивает форматы skeleton: <strong>JSON</strong> и
+            <strong>SKEL (binary)</strong>. Atlas один и тот же — текстура и
+            регионы берутся из <code>symbols.atlas</code> + <code>symbols.webp</code>.
+          </p>
+        </div>
+        <div class="flow">
+          <div class="flow-step">
+            <strong>Файлы</strong>
+            <span>.atlas + .json/.skel</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="flow-step">
+            <strong>loadSpineAssets</strong>
+            <span>fetch + TextureAtlas</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="flow-step">
+            <strong>LoadedSpineAssets</strong>
+            <span>atlas + bytes/text</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="flow-step">
+            <strong>parseSkeletonData</strong>
+            <span>SkeletonData</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-slide="2">
+        <h2>Какие файлы участвуют</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Файл</th>
+              <th>Роль</th>
+              <th>Когда загружается</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>symbols.atlas</code></td>
+              <td>
+                Текстовое описание texture atlas: имя PNG/WebP, размер страницы,
+                координаты регионов (спрайтов)
+              </td>
+              <td>Всегда, для JSON и SKEL</td>
+            </tr>
+            <tr>
+              <td><code>symbols.webp</code></td>
+              <td>
+                Сама текстура. В <code>loadSpineAssets</code> не fetch-ится
+                напрямую — atlas ссылается на неё; WebGL-загрузчик подтянет при
+                рендере
+              </td>
+              <td>Playback (AssetManager)</td>
+            </tr>
+            <tr>
+              <td><code>animation_minor.json</code></td>
+              <td>
+                Skeleton в JSON: bones, slots, skins, animations, events
+              </td>
+              <td>format === "json"</td>
+            </tr>
+            <tr>
+              <td><code>animation_minor.skel</code></td>
+              <td>Тот же skeleton в бинарном формате Spine</td>
+              <td>format === "skel"</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top: 16px">
+          Atlas нужен обоим форматам: skeleton хранит логику и ссылки на
+          attachments, а atlas — где на текстуре лежит каждый регион.
+        </div>
+      </section>
+
+      <section class="slide" data-slide="3">
+        <h2>Этап 1: loadSpineAssets</h2>
+        <p>
+          Асинхронная загрузка через <code>fetch</code>. Atlas и skeleton
+          качаются <strong>параллельно</strong> через <code>Promise.all</code>.
+        </p>
+        <pre><code>const [atlasResponse, skeletonResponse] = await Promise.all([
+  fetch("/assets/symbols.atlas"),
+  fetch(format === "json"
+    ? "/assets/animation_minor.json"
+    : "/assets/animation_minor.skel"),
+]);</code></pre>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Atlas</h3>
+            <ol>
+              <li><code>atlasResponse.text()</code> — строка atlas-файла</li>
+              <li><code>new TextureAtlas(atlasText)</code> — парсинг регионов</li>
+            </ol>
+            <pre><code>symbols.webp
+size:2048,2048
+filter:Linear,Linear
+1_coin_blick
+bounds:1904,1371,91,136
+...</code></pre>
+          </div>
+          <div class="card">
+            <h3>Skeleton (зависит от format)</h3>
+            <p><strong>JSON:</strong></p>
+            <ul>
+              <li><code>skeletonResponse.text()</code></li>
+              <li>сохраняется в <code>skeletonText</code></li>
+              <li><code>skeletonBytes</code> = пустой массив</li>
+            </ul>
+            <p><strong>SKEL:</strong></p>
+            <ul>
+              <li><code>arrayBuffer()</code> → <code>Uint8Array</code></li>
+              <li><code>skeletonText</code> = ""</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-slide="4">
+        <h2>Результат loadSpineAssets</h2>
+        <p>Функция возвращает объект <code>LoadedSpineAssets</code>:</p>
+        <pre><code>interface LoadedSpineAssets {
+  atlas: TextureAtlas;        // уже распарсенный atlas
+  skeletonBytes: Uint8Array;  // для SKEL
+  skeletonText: string;       // для JSON
+  fileSizeBytes: number;      // для benchmark
+}</code></pre>
+
+        <div class="card highlight">
+          <h3>Важно</h3>
+          <ul>
+            <li>
+              На этом этапе skeleton <strong>ещё не распарсен</strong> — только
+              сырые байты или текст скачаны из сети.
+            </li>
+            <li>
+              <code>TextureAtlas</code> уже создан: известны имена регионов и их
+              UV/ bounds на texture page.
+            </li>
+            <li>
+              Текстура <code>symbols.webp</code> пока не обязательна для
+              parse-benchmark в браузере — достаточно atlas + skeleton data.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide" data-slide="5">
+        <h2>Этап 2: parseSkeletonData</h2>
+        <p>
+          Синхронный парсинг skeleton в структуру runtime
+          <code>SkeletonData</code>. Формат выбирается параметром
+          <code>format</code>.
+        </p>
+
+        <div class="flow">
+          <div class="flow-step">
+            <strong>TextureAtlas</strong>
+            <span>из LoadedSpineAssets</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="flow-step">
+            <strong>AtlasAttachmentLoader</strong>
+            <span>связка attachment ↔ регион</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="flow-step">
+            <strong>SkeletonJson / SkeletonBinary</strong>
+            <span>readSkeletonData()</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="flow-step">
+            <strong>SkeletonData</strong>
+            <span>готов к использованию</span>
+          </div>
+        </div>
+
+        <pre><code>const attachmentLoader = new AtlasAttachmentLoader(assets.atlas);
+
+if (format === "json") {
+  const skeletonJson = new SkeletonJson(attachmentLoader);
+  return skeletonJson.readSkeletonData(assets.skeletonText);
+}
+
+const skeletonBinary = new SkeletonBinary(attachmentLoader);
+return skeletonBinary.readSkeletonData(assets.skeletonBytes);</code></pre>
+      </section>
+
+      <section class="slide" data-slide="6">
+        <h2>Роль AtlasAttachmentLoader</h2>
+        <p>
+          При чтении skeleton runtime встречает attachments типа Region, Mesh и
+          т.д. Имена вроде <code>mini_coin</code>, <code>blick</code> должны
+          сопоставиться с регионами atlas.
+        </p>
+        <div class="card">
+          <h3>Что делает loader</h3>
+          <ul>
+            <li>
+              Получает имя attachment из skeleton data (JSON или binary)
+            </li>
+            <li>
+              Ищет регион в <code>TextureAtlas</code> по имени
+            </li>
+            <li>
+              Создаёт <code>RegionAttachment</code> / mesh с UV, размерами,
+              offsets
+            </li>
+          </ul>
+        </div>
+        <div class="compare">
+          <div class="card">
+            <h3>В skeleton JSON</h3>
+            <pre><code>"coin": {
+  "mini_coin": {
+    "path": "minor_coin",
+    "width": 171,
+    "height": 171
+  }
+}</code></pre>
+          </div>
+          <div class="card">
+            <h3>В atlas</h3>
+            <pre><code>minor_coin
+bounds:...
+offsets:...
+rotate:...</code></pre>
+          </div>
+        </div>
+        <p class="note">
+          Без atlas парсер не сможет построить attachments — skeleton и atlas
+          всегда идут парой.
+        </p>
+      </section>
+
+      <section class="slide" data-slide="7">
+        <h2>Что внутри SkeletonData</h2>
+        <p>
+          <code>readSkeletonData()</code> строит полное описание персонажа/сцены
+          в памяти:
+        </p>
+        <div class="grid-2">
+          <ul>
+            <li><strong>bones</strong> — иерархия костей, transform setup</li>
+            <li><strong>slots</strong> — слоты отрисовки, blend modes</li>
+            <li><strong>skins</strong> — набор attachments по слотам</li>
+            <li><strong>animations</strong> — ключи по времени</li>
+          </ul>
+          <ul>
+            <li><strong>events</strong> — onStartWinbox, onOpacity…</li>
+            <li><strong>constraints</strong> — IK, path, physics…</li>
+            <li><strong>metadata</strong> — hash, версия Spine</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Пример из animation_minor.json</h3>
+          <pre><code>{
+  "skeleton": { "hash": "...", "spine": "4.2.43" },
+  "bones": [ { "name": "root" }, { "name": "main", "parent": "root" }, ... ],
+  "slots": [ { "name": "coin", "bone": "coin", "attachment": "mini_coin" }, ... ],
+  "animations": { "idle": { ... }, "win": { ... } }
+}</code></pre>
+        </div>
+      </section>
+
+      <section class="slide" data-slide="8">
+        <h2>JSON vs SKEL на этапе парсинга</h2>
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>JSON</th>
+              <th>SKEL</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Загрузка</td>
+              <td><code>.text()</code></td>
+              <td><code>.arrayBuffer()</code></td>
+            </tr>
+            <tr>
+              <td>Парсер</td>
+              <td><code>SkeletonJson</code></td>
+              <td><code>SkeletonBinary</code></td>
+            </tr>
+            <tr>
+              <td>Размер файла</td>
+              <td>~21 KB</td>
+              <td>~9.5 KB</td>
+            </tr>
+            <tr>
+              <td>Atlas</td>
+              <td colspan="2">Одинаковый путь — <code>AtlasAttachmentLoader</code></td>
+            </tr>
+            <tr>
+              <td>Результат</td>
+              <td colspan="2">Одинаковый тип — <code>SkeletonData</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top: 16px">
+          Разница в производительности benchmark-а — в скорости
+          <code>readSkeletonData()</code>, а не в содержимом SkeletonData после
+          парсинга. Версия runtime должна совпадать с версией экспорта (4.2.43).
+        </div>
+      </section>
+
+      <section class="slide" data-slide="9">
+        <h2>Дальше по pipeline</h2>
+        <p>После <code>SkeletonData</code> проект создаёт runtime-инстансы:</p>
+        <div class="flow">
+          <div class="flow-step">
+            <strong>SkeletonData</strong>
+            <span>шаблон</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="flow-step">
+            <strong>createRuntimeInstance</strong>
+            <span>Skeleton + AnimationState</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="flow-step">
+            <strong>updateRuntimeInstance</strong>
+            <span>update → apply → worldTransform</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="flow-step">
+            <strong>drawSkeleton</strong>
+            <span>WebGL render</span>
+          </div>
+        </div>
+        <pre><code>const skeleton = new Skeleton(skeletonData);
+const animationStateData = new AnimationStateData(skeletonData);
+const animationState = new AnimationState(animationStateData);
+animationState.setAnimation(0, animationName, true);</code></pre>
+        <div class="card">
+          <h3>Два пути загрузки в проекте</h3>
+          <ul>
+            <li>
+              <strong>Parse benchmark</strong> — <code>loadSpineAssets</code> +
+              <code>parseSkeletonData</code> (fetch)
+            </li>
+            <li>
+              <strong>Playback benchmark</strong> — <code>AssetManager</code>
+              из spine-webgl (atlas + json/skel + текстуры для GPU)
+            </li>
+          </ul>
+          <p>
+            Оба пути в итоге вызывают <code>parseSkeletonData</code> с
+            одинаковой структурой <code>LoadedSpineAssets</code>.
+          </p>
+        </div>
+      </section>
+
+      <section class="slide" data-slide="10">
+        <h2>Краткое резюме</h2>
+        <div class="card highlight">
+          <ol>
+            <li>
+              <strong>loadSpineAssets</strong> — сеть: atlas всегда + json или
+              skel; atlas сразу парсится в <code>TextureAtlas</code>.
+            </li>
+            <li>
+              <strong>LoadedSpineAssets</strong> — промежуточный контейнер: atlas
+              готов, skeleton — сырые данные.
+            </li>
+            <li>
+              <strong>parseSkeletonData</strong> — CPU: через
+              <code>AtlasAttachmentLoader</code> skeleton превращается в
+              <code>SkeletonData</code>.
+            </li>
+            <li>
+              Формат JSON/SKEL влияет только на способ чтения skeleton; atlas и
+              итоговая модель данных общие.
+            </li>
+          </ol>
+        </div>
+        <p class="subtitle" style="margin-top: 24px">
+          Источник: <code>src/shared/spineLoader.ts</code> · проект
+          spine-json-or-skel
+        </p>
+      </section>
+    </div>
+
+    <div class="toolbar">
+      <button type="button" id="prev">← Назад</button>
+      <div class="slide-counter" id="counter">1 / 10</div>
+      <button type="button" id="next" class="primary">Далее →</button>
+    </div>
+
+    <script>
+      const slides = Array.from(document.querySelectorAll(".slide"));
+      const counter = document.getElementById("counter");
+      const prevBtn = document.getElementById("prev");
+      const nextBtn = document.getElementById("next");
+      let index = 0;
+
+      function render() {
+        slides.forEach((slide, i) => {
+          slide.classList.toggle("active", i === index);
+        });
+        counter.textContent = `${index + 1} / ${slides.length}`;
+        prevBtn.disabled = index === 0;
+        nextBtn.disabled = index === slides.length - 1;
+      }
+
+      function go(delta) {
+        index = Math.max(0, Math.min(slides.length - 1, index + delta));
+        render();
+      }
+
+      prevBtn.addEventListener("click", () => go(-1));
+      nextBtn.addEventListener("click", () => go(1));
+
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowRight" || event.key === "PageDown") go(1);
+        if (event.key === "ArrowLeft" || event.key === "PageUp") go(-1);
+      });
+
+      render();
+    </script>
+  </body>
+</html>
