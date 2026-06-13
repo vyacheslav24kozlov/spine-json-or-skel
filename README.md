@@ -2,7 +2,20 @@
 
 Benchmark для сравнения производительности Spine-анимаций в форматах **JSON** и **SKEL** (binary).
 
-Используется ассет `assets/animation_minor` (Spine 4.2.43) и runtime `@esotericsoftware/spine-core` / `spine-webgl` 4.2.43.
+## Версии Spine
+
+Ассеты в `assets/` экспортированы из **Spine Editor 4.2.43** (`animation_minor.json`, `animation_minor.skel`).
+
+Runtime в `package.json` должен совпадать с версией ассетов:
+
+| Пакет | Версия |
+|-------|--------|
+| `@esotericsoftware/spine-core` | `4.2.43` |
+| `@esotericsoftware/spine-webgl` | `4.2.43` |
+
+Не обновляйте runtime на 4.3.x и новее без переэкспорта ассетов. Бинарный формат `.skel` меняется между мажорными версиями Spine: при несовпадении версий парсинг SKEL падает (например, `Bone name must not be null`). JSON может загрузиться, но поведение всё равно не гарантировано.
+
+Если нужен runtime 4.3+, переэкспортируйте skeleton из Spine Editor той же версии и обновите зависимости.
 
 ## Что измеряется
 
