@@ -14,7 +14,7 @@ import type { ParseBenchmarkResult } from "./types";
 const INSTANCE_COUNT = Number(process.env.INSTANCES ?? 100);
 const ASSETS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../assets",
+  "../public/assets",
 );
 
 function printParseResult(result: ParseBenchmarkResult): void {

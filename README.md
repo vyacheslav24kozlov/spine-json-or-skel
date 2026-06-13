@@ -4,7 +4,7 @@ Benchmark для сравнения производительности Spine-�
 
 ## Версии Spine
 
-Ассеты в `assets/` экспортированы из **Spine Editor 4.2.43** (`animation_minor.json`, `animation_minor.skel`).
+Ассеты в `public/assets/` экспортированы из **Spine Editor 4.2.43** (`animation_minor.json`, `animation_minor.skel`).
 
 Runtime в `package.json` должен совпадать с версией ассетов:
 
@@ -55,10 +55,17 @@ npm run dev
 
 Откройте http://localhost:5173 и нажмите **«Запустить benchmark»**.
 
+Production-сборка:
+
+```bash
+npm run build
+npm run preview
+```
+
 ## Структура
 
 ```
-assets/                 # Spine-ассеты
+public/assets/          # Spine-ассеты (копируются в dist при сборке)
 src/
   main.ts               # веб-интерфейс benchmark
   parse-cli.ts          # CLI для парсинга
