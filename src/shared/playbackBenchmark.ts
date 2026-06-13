@@ -8,7 +8,7 @@ import { Physics, Vector2 } from "@esotericsoftware/spine-core";
 import type { PlaybackBenchmarkResult, SkeletonFormat } from "../types";
 import { summarizeFrameTimes } from "./metrics";
 import {
-  createRuntimeInstance,
+  benchmarkCreateRuntimeInstances,
   parseSkeletonData,
   updateRuntimeInstance,
   type LoadedSpineAssets,
@@ -111,9 +111,12 @@ export async function runPlaybackBenchmark(
 
   const assets = await loadAssetsForPlayback(canvas, format);
   const skeletonData = parseSkeletonData(assets, format);
-  const instances = Array.from({ length: instanceCount }, () =>
-    createRuntimeInstance(skeletonData, animationName),
+  const instanceCreateBenchmark = benchmarkCreateRuntimeInstances(
+    skeletonData,
+    animationName,
+    instanceCount,
   );
+  const instances = instanceCreateBenchmark.instances;
 
   const context = new ManagedWebGLRenderingContext(canvas);
   const renderer = new SceneRenderer(canvas, context);
@@ -166,5 +169,16 @@ export async function runPlaybackBenchmark(
     minFps: stats.minFps,
     droppedFrames: stats.droppedFrames,
     frameTimeP95Ms: stats.frameTimeP95Ms,
+    instanceCreate: {
+      format,
+      instanceCount,
+      animationName,
+      totalCreateMs: instanceCreateBenchmark.totalCreateMs,
+      avgCreateMs: instanceCreateBenchmark.avgCreateMs,
+      minCreateMs: instanceCreateBenchmark.minCreateMs,
+      maxCreateMs: instanceCreateBenchmark.maxCreateMs,
+      droppedFramesDuringCreate: instanceCreateBenchmark.droppedFramesDuringCreate,
+      longestFrameGapMs: instanceCreateBenchmark.longestFrameGapMs,
+    },
   };
 }

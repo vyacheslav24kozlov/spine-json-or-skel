@@ -22,6 +22,19 @@ export interface PlaybackBenchmarkResult {
   minFps: number;
   droppedFrames: number;
   frameTimeP95Ms: number;
+  instanceCreate: InstanceCreateBenchmarkResult;
+}
+
+export interface InstanceCreateBenchmarkResult {
+  format: SkeletonFormat;
+  instanceCount: number;
+  animationName: string;
+  totalCreateMs: number;
+  avgCreateMs: number;
+  minCreateMs: number;
+  maxCreateMs: number;
+  droppedFramesDuringCreate: number;
+  longestFrameGapMs: number;
 }
 
 export interface BenchmarkSuiteResult {

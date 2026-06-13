@@ -7,6 +7,7 @@ import {
 } from "./shared/metrics";
 import type {
   BenchmarkSuiteResult,
+  InstanceCreateBenchmarkResult,
   ParseBenchmarkResult,
   PlaybackBenchmarkResult,
 } from "./types";
@@ -68,6 +69,39 @@ function renderPlaybackCard(result: PlaybackBenchmarkResult): string {
   ]);
 }
 
+function renderInstanceCreateCard(result: InstanceCreateBenchmarkResult): string {
+  return renderMetricCard(`Создание инстансов — ${result.format.toUpperCase()}`, [
+    ["Анимация", result.animationName],
+    ["Инстансов", String(result.instanceCount)],
+    ["Всего", formatMs(result.totalCreateMs)],
+    ["Среднее на инстанс", formatMs(result.avgCreateMs)],
+    ["Min / Max", `${formatMs(result.minCreateMs)} / ${formatMs(result.maxCreateMs)}`],
+    ["Просадки при создании", String(result.droppedFramesDuringCreate)],
+    ["Макс. блокировка кадра", formatMs(result.longestFrameGapMs)],
+  ]);
+}
+
+function renderInstanceCreateComparison(
+  json: InstanceCreateBenchmarkResult,
+  skel: InstanceCreateBenchmarkResult,
+): string {
+  const createSpeedup = json.totalCreateMs / skel.totalCreateMs;
+
+  return `
+    <section class="comparison instance-create-comparison">
+      <h3>Сравнение создания инстансов</h3>
+      <dl>
+        <dt>SKEL быстрее создаёт инстансы</dt>
+        <dd>${createSpeedup.toFixed(2)}x</dd>
+        <dt>Экономия времени создания</dt>
+        <dd>${formatMs(json.totalCreateMs - skel.totalCreateMs)}</dd>
+        <dt>Разница среднего на инстанс</dt>
+        <dd>${formatMs(json.avgCreateMs - skel.avgCreateMs)} (JSON − SKEL)</dd>
+      </dl>
+    </section>
+  `;
+}
+
 function renderComparison(
   json: BenchmarkSuiteResult,
   skel: BenchmarkSuiteResult,
@@ -104,6 +138,12 @@ function renderResults(
   resultsEl.innerHTML = [
     renderParseCard(json.parse),
     renderParseCard(skel.parse),
+    renderInstanceCreateCard(json.playback.instanceCreate),
+    renderInstanceCreateCard(skel.playback.instanceCreate),
+    renderInstanceCreateComparison(
+      json.playback.instanceCreate,
+      skel.playback.instanceCreate,
+    ),
     renderPlaybackCard(json.playback),
     renderPlaybackCard(skel.playback),
     renderComparison(json, skel),

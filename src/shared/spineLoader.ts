@@ -10,6 +10,7 @@ import {
   TextureAtlas,
 } from "@esotericsoftware/spine-core";
 import type { SkeletonFormat } from "../types";
+import { estimateDroppedFrames } from "./metrics";
 
 export interface LoadedSpineAssets {
   atlas: TextureAtlas;
@@ -86,6 +87,55 @@ export function createRuntimeInstance(
   const animationState = new AnimationState(animationStateData);
   animationState.setAnimation(0, animationName, true);
   return { skeleton, animationState };
+}
+
+export interface CreateRuntimeInstancesBenchmark {
+  instances: RuntimeInstance[];
+  totalCreateMs: number;
+  avgCreateMs: number;
+  minCreateMs: number;
+  maxCreateMs: number;
+  droppedFramesDuringCreate: number;
+  longestFrameGapMs: number;
+}
+
+export function benchmarkCreateRuntimeInstances(
+  skeletonData: SkeletonData,
+  animationName: string,
+  instanceCount: number,
+  warmupCount = 3,
+): CreateRuntimeInstancesBenchmark {
+  for (let index = 0; index < warmupCount; index += 1) {
+    createRuntimeInstance(skeletonData, animationName);
+  }
+
+  const createDurations: number[] = [];
+  let droppedFramesDuringCreate = 0;
+  let longestFrameGapMs = 0;
+  const instances: RuntimeInstance[] = [];
+
+  for (let index = 0; index < instanceCount; index += 1) {
+    const startedAt = performance.now();
+    instances.push(createRuntimeInstance(skeletonData, animationName));
+    const endedAt = performance.now();
+    const duration = endedAt - startedAt;
+    createDurations.push(duration);
+
+    droppedFramesDuringCreate += estimateDroppedFrames(duration);
+    longestFrameGapMs = Math.max(longestFrameGapMs, duration);
+  }
+
+  const totalCreateMs = createDurations.reduce((sum, value) => sum + value, 0);
+
+  return {
+    instances,
+    totalCreateMs,
+    avgCreateMs: totalCreateMs / instanceCount,
+    minCreateMs: Math.min(...createDurations),
+    maxCreateMs: Math.max(...createDurations),
+    droppedFramesDuringCreate,
+    longestFrameGapMs,
+  };
 }
 
 export function updateRuntimeInstance(
