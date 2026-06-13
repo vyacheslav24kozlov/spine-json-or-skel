@@ -4,6 +4,7 @@ import {
   ResizeMode,
   SceneRenderer,
 } from "@esotericsoftware/spine-webgl";
+import { Physics, Vector2 } from "@esotericsoftware/spine-core";
 import type { PlaybackBenchmarkResult, SkeletonFormat } from "../types";
 import { summarizeFrameTimes } from "./metrics";
 import {
@@ -71,14 +72,16 @@ async function loadAssetsForPlayback(
 
 function layoutInstances(
   instances: RuntimeInstance[],
-  canvasWidth: number,
-  canvasHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
 ): void {
   const columns = Math.ceil(Math.sqrt(instances.length));
   const rows = Math.ceil(instances.length / columns);
-  const cellWidth = canvasWidth / columns;
-  const cellHeight = canvasHeight / rows;
+  const cellWidth = viewportWidth / columns;
+  const cellHeight = viewportHeight / rows;
   const scale = Math.min(cellWidth, cellHeight) / 220;
+  const boundsOffset = new Vector2();
+  const boundsSize = new Vector2();
 
   instances.forEach((instance, index) => {
     const column = index % columns;
@@ -86,10 +89,18 @@ function layoutInstances(
     const skeleton = instance.skeleton;
 
     skeleton.setToSetupPose();
-    skeleton.x = column * cellWidth + cellWidth * 0.5;
-    skeleton.y = row * cellHeight + cellHeight * 0.35;
     skeleton.scaleX = scale;
     skeleton.scaleY = scale;
+    skeleton.updateWorldTransform(Physics.update);
+    skeleton.getBounds(boundsOffset, boundsSize);
+
+    const cellCenterX = -viewportWidth / 2 + (column + 0.5) * cellWidth;
+    const cellCenterY = viewportHeight / 2 - (row + 0.5) * cellHeight;
+    const visualCenterX = boundsOffset.x + boundsSize.x / 2;
+    const visualCenterY = boundsOffset.y + boundsSize.y / 2;
+
+    skeleton.x = cellCenterX - visualCenterX;
+    skeleton.y = cellCenterY - visualCenterY;
   });
 }
 
@@ -107,7 +118,12 @@ export async function runPlaybackBenchmark(
   const context = new ManagedWebGLRenderingContext(canvas);
   const renderer = new SceneRenderer(canvas, context);
   const gl = context.gl;
-  layoutInstances(instances, canvas.clientWidth, canvas.clientHeight);
+  renderer.resize(ResizeMode.Expand);
+  layoutInstances(
+    instances,
+    renderer.camera.viewportWidth,
+    renderer.camera.viewportHeight,
+  );
 
   const frameTimesMs: number[] = [];
   let previousTimestamp = performance.now();
