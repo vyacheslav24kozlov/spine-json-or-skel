@@ -81,54 +81,84 @@ function renderInstanceCreateCard(result: InstanceCreateBenchmarkResult): string
   ]);
 }
 
+function renderComparisonBlock(
+  title: string,
+  className: string,
+  metrics: Array<[string, string]>,
+): string {
+  const rows = metrics
+    .map(
+      ([label, value]) =>
+        `<dt>${label}</dt><dd>${value}</dd>`,
+    )
+    .join("");
+
+  return `
+    <section class="comparison ${className}">
+      <h3>${title}</h3>
+      <dl>${rows}</dl>
+    </section>
+  `;
+}
+
+function renderParseComparison(
+  json: ParseBenchmarkResult,
+  skel: ParseBenchmarkResult,
+): string {
+  const parseSpeedup = json.totalParseMs / skel.totalParseMs;
+  const sizeReduction =
+    ((json.fileSizeBytes - skel.fileSizeBytes) / json.fileSizeBytes) * 100;
+
+  return renderComparisonBlock("Сравнение парсинга", "parse-comparison", [
+    ["SKEL быстрее парсится", `${parseSpeedup.toFixed(2)}x`],
+    ["SKEL меньше по размеру", `${sizeReduction.toFixed(1)}%`],
+    ["Экономия времени парсинга", formatMs(json.totalParseMs - skel.totalParseMs)],
+    ["Разница среднего на копию", `${formatMs(json.avgParseMs - skel.avgParseMs)} (JSON − SKEL)`],
+  ]);
+}
+
 function renderInstanceCreateComparison(
   json: InstanceCreateBenchmarkResult,
   skel: InstanceCreateBenchmarkResult,
 ): string {
   const createSpeedup = json.totalCreateMs / skel.totalCreateMs;
 
-  return `
-    <section class="comparison instance-create-comparison">
-      <h3>Сравнение создания инстансов</h3>
-      <dl>
-        <dt>SKEL быстрее создаёт инстансы</dt>
-        <dd>${createSpeedup.toFixed(2)}x</dd>
-        <dt>Экономия времени создания</dt>
-        <dd>${formatMs(json.totalCreateMs - skel.totalCreateMs)}</dd>
-        <dt>Разница среднего на инстанс</dt>
-        <dd>${formatMs(json.avgCreateMs - skel.avgCreateMs)} (JSON − SKEL)</dd>
-      </dl>
-    </section>
-  `;
+  return renderComparisonBlock(
+    "Сравнение создания инстансов",
+    "instance-create-comparison",
+    [
+      ["SKEL быстрее создаёт инстансы", `${createSpeedup.toFixed(2)}x`],
+      ["Экономия времени создания", formatMs(json.totalCreateMs - skel.totalCreateMs)],
+      [
+        "Разница среднего на инстанс",
+        `${formatMs(json.avgCreateMs - skel.avgCreateMs)} (JSON − SKEL)`,
+      ],
+    ],
+  );
 }
 
-function renderComparison(
-  json: BenchmarkSuiteResult,
-  skel: BenchmarkSuiteResult,
+function renderPlaybackComparison(
+  json: PlaybackBenchmarkResult,
+  skel: PlaybackBenchmarkResult,
 ): string {
-  const parseSpeedup = json.parse.totalParseMs / skel.parse.totalParseMs;
-  const playbackFpsDelta =
-    skel.playback.avgFps - json.playback.avgFps;
-  const sizeReduction =
-    ((json.parse.fileSizeBytes - skel.parse.fileSizeBytes) /
-      json.parse.fileSizeBytes) *
-    100;
+  const avgFpsDelta = skel.avgFps - json.avgFps;
+  const minFpsDelta = skel.minFps - json.minFps;
+  const p95FrameTimeDelta = json.frameTimeP95Ms - skel.frameTimeP95Ms;
 
-  return `
-    <section class="comparison">
-      <h3>Сравнение</h3>
-      <dl>
-        <dt>SKEL быстрее парсится</dt>
-        <dd>${parseSpeedup.toFixed(2)}x</dd>
-        <dt>SKEL меньше по размеру</dt>
-        <dd>${sizeReduction.toFixed(1)}%</dd>
-        <dt>Экономия времени парсинга</dt>
-        <dd>${formatMs(json.parse.totalParseMs - skel.parse.totalParseMs)}</dd>
-        <dt>Разница FPS при playback</dt>
-        <dd>${playbackFpsDelta >= 0 ? "+" : ""}${playbackFpsDelta.toFixed(1)} FPS (SKEL vs JSON)</dd>
-      </dl>
-    </section>
-  `;
+  return renderComparisonBlock("Сравнение playback", "playback-comparison", [
+    [
+      "Разница среднего FPS",
+      `${avgFpsDelta >= 0 ? "+" : ""}${avgFpsDelta.toFixed(1)} FPS (SKEL vs JSON)`,
+    ],
+    [
+      "Разница минимального FPS",
+      `${minFpsDelta >= 0 ? "+" : ""}${minFpsDelta.toFixed(1)} FPS (SKEL vs JSON)`,
+    ],
+    [
+      "Разница P95 frame time",
+      `${formatMs(p95FrameTimeDelta)} (JSON − SKEL)`,
+    ],
+  ]);
 }
 
 function renderResults(
@@ -138,6 +168,7 @@ function renderResults(
   resultsEl.innerHTML = [
     renderParseCard(json.parse),
     renderParseCard(skel.parse),
+    renderParseComparison(json.parse, skel.parse),
     renderInstanceCreateCard(json.playback.instanceCreate),
     renderInstanceCreateCard(skel.playback.instanceCreate),
     renderInstanceCreateComparison(
@@ -146,7 +177,7 @@ function renderResults(
     ),
     renderPlaybackCard(json.playback),
     renderPlaybackCard(skel.playback),
-    renderComparison(json, skel),
+    renderPlaybackComparison(json.playback, skel.playback),
   ].join("");
 }
 
