@@ -1,12 +1,11 @@
 import { TextureAtlas } from "@esotericsoftware/spine-core";
 import type { ParseBenchmarkResult, SkeletonFormat } from "../types";
-import { estimateDroppedFrames } from "./metrics";
 import {
   parseSkeletonData,
+  recordParseSample,
   type LoadedSpineAssets,
-} from "./spineLoader";
-
-export type { LoadedSpineAssets } from "./spineLoader";
+  type ParseSampleAccumulator,
+} from "./utils";
 
 export function runParseBenchmarkNode(
   assets: LoadedSpineAssets,
@@ -18,22 +17,17 @@ export function runParseBenchmarkNode(
     parseSkeletonData(assets, format);
   }
 
-  const parseDurations: number[] = [];
-  let droppedFramesDuringParse = 0;
-  let longestFrameGapMs = 0;
+  const acc: ParseSampleAccumulator = {
+    durations: [],
+    droppedFrames: 0,
+    longestFrameGapMs: 0,
+  };
 
   for (let index = 0; index < instanceCount; index += 1) {
-    const startedAt = performance.now();
-    parseSkeletonData(assets, format);
-    const endedAt = performance.now();
-    const duration = endedAt - startedAt;
-    parseDurations.push(duration);
-
-    droppedFramesDuringParse += estimateDroppedFrames(duration);
-    longestFrameGapMs = Math.max(longestFrameGapMs, duration);
+    recordParseSample(assets, format, acc);
   }
 
-  const totalParseMs = parseDurations.reduce((sum, value) => sum + value, 0);
+  const totalParseMs = acc.durations.reduce((sum, value) => sum + value, 0);
 
   return {
     format,
@@ -41,10 +35,10 @@ export function runParseBenchmarkNode(
     fileSizeBytes: assets.fileSizeBytes,
     totalParseMs,
     avgParseMs: totalParseMs / instanceCount,
-    minParseMs: Math.min(...parseDurations),
-    maxParseMs: Math.max(...parseDurations),
-    droppedFramesDuringParse,
-    longestFrameGapMs,
+    minParseMs: Math.min(...acc.durations),
+    maxParseMs: Math.max(...acc.durations),
+    droppedFramesDuringParse: acc.droppedFrames,
+    longestFrameGapMs: acc.longestFrameGapMs,
   };
 }
 

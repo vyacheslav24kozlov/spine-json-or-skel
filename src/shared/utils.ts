@@ -73,6 +73,31 @@ export function parseSkeletonData(
   return skeletonBinary.readSkeletonData(assets.skeletonBytes);
 }
 
+export interface ParseSampleAccumulator {
+  durations: number[];
+  droppedFrames: number;
+  longestFrameGapMs: number;
+}
+
+/**
+ * Парсит скелет один раз, измеряет длительность и обновляет аккумулятор
+ * статистикой по этой итерации (длительность, пропущенные кадры, макс. задержка).
+ */
+export function recordParseSample(
+  assets: LoadedSpineAssets,
+  format: SkeletonFormat,
+  acc: ParseSampleAccumulator,
+): void {
+  const startedAt = performance.now();
+  parseSkeletonData(assets, format);
+  const endedAt = performance.now();
+  const duration = endedAt - startedAt;
+  acc.durations.push(duration);
+
+  acc.droppedFrames += estimateDroppedFrames(duration);
+  acc.longestFrameGapMs = Math.max(acc.longestFrameGapMs, duration);
+}
+
 export interface RuntimeInstance {
   skeleton: Skeleton;
   animationState: AnimationState;

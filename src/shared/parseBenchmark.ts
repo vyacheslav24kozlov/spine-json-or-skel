@@ -1,12 +1,11 @@
 import type { ParseBenchmarkResult, SkeletonFormat } from "../types";
-import {
-  estimateDroppedFrames,
-  FRAME_BUDGET_MS,
-} from "./metrics";
+import { FRAME_BUDGET_MS } from "./metrics";
 import {
   loadSpineAssets,
   parseSkeletonData,
-} from "./spineLoader";
+  recordParseSample,
+  type ParseSampleAccumulator,
+} from "./utils";
 
 export interface ParseBenchmarkOptions {
   format: SkeletonFormat;
@@ -30,29 +29,23 @@ export async function runParseBenchmark(
     parseSkeletonData(assets, format);
   }
 
+  // Синхронизуемся с фреймом браузера перед тестом
   await waitForNextFrame();
-  const parseStartFrame = performance.now();
-  await waitForNextFrame();
-  const frameBeforeParse = performance.now();
-  const frameGapBeforeParse = frameBeforeParse - parseStartFrame;
 
-  const parseDurations: number[] = [];
-  let droppedFramesDuringParse = 0;
-  let longestFrameGapMs = frameGapBeforeParse;
+  const acc: ParseSampleAccumulator = {
+    durations: [],
+    droppedFrames: 0,
+    longestFrameGapMs: 0,
+  };
 
   for (let index = 0; index < instanceCount; index += 1) {
-    const startedAt = performance.now();
-    parseSkeletonData(assets, format);
-    const endedAt = performance.now();
-    const duration = endedAt - startedAt;
-    parseDurations.push(duration);
+    recordParseSample(assets, format, acc);
 
-    const blockingMs = duration;
-    droppedFramesDuringParse += estimateDroppedFrames(blockingMs);
-    longestFrameGapMs = Math.max(longestFrameGapMs, blockingMs);
+    // Добавить ожидание между итерациями для более реалистичного тестирования
+    await waitForNextFrame();
   }
 
-  const totalParseMs = parseDurations.reduce((sum, value) => sum + value, 0);
+  const totalParseMs = acc.durations.reduce((sum, value) => sum + value, 0);
 
   return {
     format,
@@ -60,10 +53,10 @@ export async function runParseBenchmark(
     fileSizeBytes: assets.fileSizeBytes,
     totalParseMs,
     avgParseMs: totalParseMs / instanceCount,
-    minParseMs: Math.min(...parseDurations),
-    maxParseMs: Math.max(...parseDurations),
-    droppedFramesDuringParse,
-    longestFrameGapMs,
+    minParseMs: Math.min(...acc.durations),
+    maxParseMs: Math.max(...acc.durations),
+    droppedFramesDuringParse: acc.droppedFrames,
+    longestFrameGapMs: acc.longestFrameGapMs,
   };
 }
 

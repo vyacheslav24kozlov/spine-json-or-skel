@@ -13,7 +13,7 @@ import {
   updateRuntimeInstance,
   type LoadedSpineAssets,
   type RuntimeInstance,
-} from "./spineLoader";
+} from "./utils";
 
 export interface PlaybackBenchmarkOptions {
   canvas: HTMLCanvasElement;
