@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Spine: замер парсинга (runParseBenchmark)</title>
+  <style>
+    :root {
+      --bg: #11151c;
+      --panel: #1a2130;
+      --panel-2: #0f141d;
+      --text: #e8edf5;
+      --muted: #9aa7bd;
+      --accent: #3b82f6;
+      --accent-2: #34d399;
+      --warn: #fbbf24;
+      --border: #334055;
+      --code: #dbeafe;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    .deck {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 24px 120px;
+    }
+
+    .toolbar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding: 16px;
+      background: rgba(17, 21, 28, 0.92);
+      border-top: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+    }
+
+    .toolbar button {
+      font: inherit;
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .toolbar button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .slide-counter {
+      align-self: center;
+      color: var(--muted);
+      min-width: 80px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .slide {
+      display: none;
+      animation: fade 0.25s ease;
+    }
+
+    .slide.active {
+      display: block;
+    }
+
+    @keyframes fade {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin: 0 0 12px;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      margin: 0 0 16px;
+      color: var(--accent-2);
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      margin: 20px 0 8px;
+    }
+
+    p,
+    li {
+      color: #c9d4e6;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 1.05rem;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin: 16px 0;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #102033;
+      border: 1px solid #23486b;
+      color: #93c5fd;
+      font-size: 0.85rem;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      overflow: auto;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      color: var(--code);
+    }
+
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .flow-step {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      min-width: 130px;
+    }
+
+    .flow-step strong {
+      display: block;
+      margin-bottom: 4px;
+      color: white;
+    }
+
+    .flow-step span {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .arrow {
+      color: var(--accent);
+      font-size: 1.4rem;
+      font-weight: bold;
+    }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .compare .card h3 {
+      margin-top: 0;
+    }
+
+    .highlight {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25);
+    }
+
+    .note {
+      border-left: 4px solid var(--warn);
+      padding: 10px 14px;
+      background: rgba(251, 191, 36, 0.08);
+      border-radius: 0 8px 8px 0;
+      color: #fde68a;
+    }
+
+    .metric {
+      border-left: 4px solid var(--accent-2);
+      padding: 10px 14px;
+      background: rgba(52, 211, 153, 0.08);
+      border-radius: 0 8px 8px 0;
+      color: #bbf7d0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    th {
+      background: var(--panel-2);
+      color: var(--muted);
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+
+    @media (max-width: 860px) {
+      .grid-2,
+      .compare {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="deck">
+  <section class="slide active" data-slide="1">
+    <h1>Замер парсинга Spine</h1>
+    <p class="subtitle">
+      Как <code>runParseBenchmark</code> измеряет скорость
+      <code>readSkeletonData()</code> и почему JSON и SKEL парсятся с разной
+      скоростью
+    </p>
+    <div class="card">
+      <span class="tag">src/shared/parseBenchmark.ts</span>
+      <span class="tag">src/shared/utils.ts</span>
+      <span class="tag">src/shared/metrics.ts</span>
+      <p>
+        Бенчмарк многократно парсит один и тот же skeleton и собирает
+        статистику: среднее/мин/макс время, «пропущенные кадры» и самую
+        долгую блокировку. Сравниваются два формата —
+        <strong>JSON</strong> (текст) и <strong>SKEL</strong> (бинарь).
+      </p>
+    </div>
+    <div class="flow">
+      <div class="flow-step">
+        <strong>loadSpineAssets</strong>
+        <span>fetch atlas + skeleton</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-step">
+        <strong>warmup ×3</strong>
+        <span>прогрев JIT</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-step">
+        <strong>recordParseSample ×N</strong>
+        <span>замер каждой итерации</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-step">
+        <strong>ParseBenchmarkResult</strong>
+        <span>агрегированные метрики</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="2">
+    <h2>runParseBenchmark: общая структура</h2>
+    <pre><code>const { format, instanceCount, warmupCount = 3 } = options;
+const assets = await loadSpineAssets(format);
+
+// 1. Прогрев — без измерений
+for (let i = 0; i &lt; warmupCount; i += 1) {
+  parseSkeletonData(assets, format);
+}
+
+// 2. Синхронизация с кадром браузера
+await waitForNextFrame();
+
+// 3. Аккумулятор статистики
+const acc = { durations: [], droppedFrames: 0, longestFrameGapMs: 0 };
+
+// 4. Замеряем instanceCount итераций
+for (let i = 0; i &lt; instanceCount; i += 1) {
+  recordParseSample(assets, format, acc);
+  await waitForNextFrame(); // пауза между итерациями
+}
+
+// 5. Агрегация
+const totalParseMs = acc.durations.reduce((s, v) => s + v, 0);</code></pre>
+    <div class="metric">
+      Ключевой принцип: <strong>ассеты загружаются один раз</strong>, а
+      измеряется только повторяемая часть — сам парсинг
+      <code>readSkeletonData()</code>. Сеть и atlas в замер не попадают.
+    </div>
+  </section>
+
+  <section class="slide" data-slide="3">
+    <h2>Перед замером: loadSpineAssets</h2>
+    <p>
+      Самый первый шаг <code>runParseBenchmark</code> —
+      <code>await loadSpineAssets(format)</code>. Он выполняется
+      <strong>один раз, до прогрева</strong>, поэтому сеть и подготовка
+      данных в тайминг парсинга не попадают.
+    </p>
+    <pre><code>const [atlasResponse, skeletonResponse] = await Promise.all([
+  fetch("/assets/symbols.atlas"),
+  fetch(format === "json"
+    ? "/assets/animation_minor.json"
+    : "/assets/animation_minor.skel"),
+]);
+
+const atlas = new TextureAtlas(await atlasResponse.text());
+
+if (format === "json") {
+  const skeletonText = await skeletonResponse.text();          // строка
+  return { atlas, skeletonBytes: new Uint8Array(), skeletonText,
+           fileSizeBytes: new TextEncoder().encode(skeletonText).length };
+}
+
+const skeletonBytes = new Uint8Array(await skeletonResponse.arrayBuffer());
+return { atlas, skeletonBytes, skeletonText: "",
+         fileSizeBytes: skeletonBytes.byteLength };            // байты</code></pre>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Что делает</h3>
+        <ul>
+          <li>
+            Параллельно (<code>Promise.all</code>) грузит
+            <strong>atlas</strong> и <strong>skeleton</strong> через
+            <code>fetch</code>.
+          </li>
+          <li>
+            Atlas сразу парсится в <code>TextureAtlas</code> — он одинаков
+            для обоих форматов.
+          </li>
+          <li>
+            Skeleton читается по-разному: JSON — как
+            <code>text()</code> в <code>skeletonText</code>; SKEL — как
+            <code>arrayBuffer()</code> → <code>Uint8Array</code> в
+            <code>skeletonBytes</code>.
+          </li>
+          <li>
+            Считает <code>fileSizeBytes</code> для отчёта (через
+            <code>TextEncoder</code> для JSON, <code>byteLength</code> для
+            SKEL).
+          </li>
+        </ul>
+      </div>
+      <div class="card highlight">
+        <h3>Почему до warmup</h3>
+        <ul>
+          <li>
+            Замеряем <strong>только парсинг</strong>, а не загрузку — ассеты
+            уже в памяти к моменту измерений.
+          </li>
+          <li>
+            Один и тот же <code>LoadedSpineAssets</code> переиспользуется во
+            всех итерациях: warmup и все <code>recordParseSample</code>
+            парсят из готовых <code>skeletonText</code> /
+            <code>skeletonBytes</code>.
+          </li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">
+      На выходе — <code>LoadedSpineAssets</code> { atlas, skeletonBytes,
+      skeletonText, fileSizeBytes }. Дальше с ним работают warmup и цикл
+      замеров.
+    </p>
+  </section>
+
+  <section class="slide" data-slide="4">
+    <h2>Шаг 1: warmup (прогрев)</h2>
+    <p>
+      Перед измерениями skeleton парсится <code>warmupCount</code> раз (по
+      умолчанию 3) <strong>без записи результата</strong>.
+    </p>
+    <pre><code>for (let index = 0; index &lt; warmupCount; index += 1) {
+  parseSkeletonData(assets, format);
+}</code></pre>
+    <div class="card">
+      <h3>Зачем это нужно</h3>
+      <ul>
+        <li>
+          <strong>JIT-компиляция</strong>: V8 сначала исполняет код
+          интерпретатором, и только после нескольких прогонов оптимизирует
+          «горячие» функции. Первый парс всегда медленнее.
+        </li>
+        <li>
+          <strong>Прогрев кэшей и аллокатора</strong>: подгружаются inline
+          caches, формы объектов (hidden classes) стабилизируются.
+        </li>
+        <li>
+          <strong>Честное сравнение</strong>: и JSON, и SKEL получают
+          одинаковый прогрев — измеряем стабильное состояние, а не
+          cold-start.
+        </li>
+      </ul>
+    </div>
+    <p class="note">
+      Без прогрева первые замеры были бы аномально большими и исказили бы
+      <code>avg</code> и <code>max</code>.
+    </p>
+  </section>
+
+  <section class="slide" data-slide="5">
+    <h2>Шаг 2: синхронизация с кадром</h2>
+    <p>
+      Перед циклом и между итерациями вызывается
+      <code>waitForNextFrame()</code> — обёртка над
+      <code>requestAnimationFrame</code>.
+    </p>
+    <pre><code>async function waitForNextFrame(): Promise&lt;number&gt; {
+  return new Promise((resolve) => {
+    requestAnimationFrame((timestamp) => resolve(timestamp));
+  });
+}</code></pre>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Зачем перед циклом</h3>
+        <p>
+          Начинаем замер «с чистого кадра» — не в середине занятого фрейма,
+          где браузер уже что-то делает. Это снижает шум первого замера.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Зачем между итерациями</h3>
+        <p>
+          Даём браузеру отрисовать кадр, выполнить GC и обработать события.
+          Каждая итерация стартует в сопоставимых условиях, а не упирается в
+          забитую очередь микротасков.
+        </p>
+      </div>
+    </div>
+    <p class="note">
+      Важно: <code>await waitForNextFrame()</code> стоит
+      <strong>вне</strong> замеряемого интервала. В тайминг попадает только
+      синхронный <code>parseSkeletonData</code>.
+    </p>
+  </section>
+
+  <section class="slide" data-slide="6">
+    <h2>Шаг 3: recordParseSample — сам замер</h2>
+    <p>
+      Одна итерация: парсим один раз, считаем длительность и обновляем
+      аккумулятор.
+    </p>
+    <pre><code>export function recordParseSample(assets, format, acc) {
+  const startedAt = performance.now();   // высокоточный таймер
+  parseSkeletonData(assets, format);     // ← измеряемая работа
+  const endedAt = performance.now();
+
+  const duration = endedAt - startedAt;  // мс на один парс
+  acc.durations.push(duration);
+
+  acc.droppedFrames += estimateDroppedFrames(duration);
+  acc.longestFrameGapMs = Math.max(acc.longestFrameGapMs, duration);
+}</code></pre>
+    <div class="card highlight">
+      <h3>Что именно меряется</h3>
+      <ul>
+        <li>
+          <code>performance.now()</code> — монотонный таймер с
+          суб-миллисекундной точностью (не зависит от системных часов).
+        </li>
+        <li>
+          Между двумя замерами — <strong>только</strong>
+          <code>parseSkeletonData</code>: создание
+          <code>AtlasAttachmentLoader</code> + <code>readSkeletonData()</code>.
+        </li>
+        <li>
+          Результат каждой итерации складывается в массив
+          <code>durations</code> для последующей агрегации.
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="7">
+    <h2>Метрики из metrics.ts</h2>
+    <p>Производные показатели считаются из «бюджета кадра» 60 FPS:</p>
+    <pre><code>const TARGET_FPS = 60;
+export const FRAME_BUDGET_MS = 1000 / TARGET_FPS; // ≈ 16.67 мс
+
+export function estimateDroppedFrames(blockingMs: number): number {
+  if (blockingMs &lt;= FRAME_BUDGET_MS) {
+    return 0;
+  }
+  return Math.floor(blockingMs / FRAME_BUDGET_MS);
+}</code></pre>
+    <div class="grid-2">
+      <div class="card">
+        <h3>droppedFrames</h3>
+        <p>
+          Парсинг синхронный и блокирует главный поток. Если он длится
+          дольше одного кадра (~16.67 мс), браузер не успевает отрисоваться —
+          кадры «выпадают».
+        </p>
+        <p>
+          Пример: парс на 40 мс → <code>floor(40 / 16.67) = 2</code>
+          пропущенных кадра.
+        </p>
+      </div>
+      <div class="card">
+        <h3>longestFrameGapMs</h3>
+        <p>
+          <code>Math.max</code> по всем итерациям — самая долгая разовая
+          блокировка. Показывает worst-case «фриз» интерфейса от одного
+          парса.
+        </p>
+      </div>
+    </div>
+    <p class="metric">
+      Это перевод «миллисекунд парсинга» в понятный для UI язык: сколько
+      кадров пользователь реально потеряет.
+    </p>
+  </section>
+
+  <section class="slide" data-slide="8">
+    <h2>Шаг 5: агрегация результата</h2>
+    <p>
+      После цикла из массива <code>durations</code> собирается
+      <code>ParseBenchmarkResult</code>:
+    </p>
+    <pre><code>const totalParseMs = acc.durations.reduce((sum, v) => sum + v, 0);
+
+return {
+  format,
+  instanceCount,
+  fileSizeBytes: assets.fileSizeBytes,
+  totalParseMs,
+  avgParseMs: totalParseMs / instanceCount,
+  minParseMs: Math.min(...acc.durations),
+  maxParseMs: Math.max(...acc.durations),
+  droppedFramesDuringParse: acc.droppedFrames,
+  longestFrameGapMs: acc.longestFrameGapMs,
+};</code></pre>
+    <table>
+      <thead>
+      <tr>
+        <th>Поле</th>
+        <th>Как считается</th>
+        <th>О чём говорит</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td><code>avgParseMs</code></td>
+        <td>total / instanceCount</td>
+        <td>типичная стоимость одного парса</td>
+      </tr>
+      <tr>
+        <td><code>minParseMs</code></td>
+        <td>Math.min(durations)</td>
+        <td>лучший случай (прогретый путь)</td>
+      </tr>
+      <tr>
+        <td><code>maxParseMs</code></td>
+        <td>Math.max(durations)</td>
+        <td>худший случай (GC, шум)</td>
+      </tr>
+      <tr>
+        <td><code>fileSizeBytes</code></td>
+        <td>из loadSpineAssets</td>
+        <td>размер исходных данных</td>
+      </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="slide" data-slide="9">
+    <h2>Почему JSON и SKEL парсятся по-разному</h2>
+    <p>
+      Разница не в результате — обе ветки строят одинаковый
+      <code>SkeletonData</code>. Разница в <strong>стоимости чтения</strong>:
+    </p>
+    <div class="compare">
+      <div class="card">
+        <h3>JSON → SkeletonJson</h3>
+        <pre><code>const json = new SkeletonJson(loader);
+return json.readSkeletonData(
+  assets.skeletonText // строка
+);</code></pre>
+        <ul>
+          <li>
+            Сначала <code>JSON.parse</code> токенизирует текст и строит
+            <strong>большое промежуточное дерево JS-объектов</strong>.
+          </li>
+          <li>
+            Числа хранятся как текст → нужна конвертация
+            <code>"171.5"</code> → <code>number</code>.
+          </li>
+          <li>Ключи-строки, кавычки, пробелы — лишние байты и аллокации.</li>
+          <li>Больше работы для GC из-за временных объектов.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>SKEL → SkeletonBinary</h3>
+        <pre><code>const bin = new SkeletonBinary(loader);
+return bin.readSkeletonData(
+  assets.skeletonBytes // Uint8Array
+);</code></pre>
+        <ul>
+          <li>
+            Последовательное чтение байт из <code>Uint8Array</code> — без
+            промежуточного дерева.
+          </li>
+          <li>
+            Числа уже в бинарном виде (float/varint) → читаются напрямую,
+            почти без конвертаций.
+          </li>
+          <li>Нет парсинга строк-разделителей и структуры.</li>
+          <li>Меньше аллокаций → меньше нагрузка на GC.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Итог</h3>
+        <ol>
+          <li>
+            <h4>Нет JSON.parse()</h4>
+            JSON.parse — очень быстрый, но не бесплатный. Для большого файла:
+            <code>2–10 ms</code> иногда больше. SKEL этого этапа вообще не имеет.
+          </li>
+          <li>
+            <h4>Меньше аллокаций памяти</h4>
+            JSON создаёт огромное дерево временных объектов:
+            <pre><code>{
+  bones: [...],
+  slots: [...],
+  animations: {...}
+}</code></pre>
+            которое затем Spine снова преобразует в свои структуры.
+            Получается двойная работа:
+            <pre><code>JSON text
+    ↓
+JS Object
+    ↓
+Spine Object</code></pre>
+            Для SKEL:
+            <pre><code>Binary
+    ↓
+Spine Object</code></pre>
+            Промежуточного слоя нет.
+          </li>
+          <li>
+            <h4>Меньше нагрузка на GC</h4>
+            JSON создаёт:
+            <ul>
+              <li>строки</li>
+              <li>массивы</li>
+              <li>объекты</li>
+            </ul>
+            которые после парсинга становятся мусором. Потом срабатывает GC.
+            SKEL создаёт значительно меньше временных объектов.
+          </li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="10">
+    <h2>JSON vs SKEL: сводка по замеру</h2>
+    <table>
+      <thead>
+      <tr>
+        <th></th>
+        <th>JSON</th>
+        <th>SKEL</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td>Вход в парсер</td>
+        <td><code>string</code> (skeletonText)</td>
+        <td><code>Uint8Array</code> (skeletonBytes)</td>
+      </tr>
+      <tr>
+        <td>Парсер</td>
+        <td><code>SkeletonJson</code></td>
+        <td><code>SkeletonBinary</code></td>
+      </tr>
+      <tr>
+        <td>Размер файла</td>
+        <td>больше (~21 KB)</td>
+        <td>меньше (~9.5 KB)</td>
+      </tr>
+      <tr>
+        <td>Промежуточное дерево</td>
+        <td>да (JSON.parse)</td>
+        <td>нет (поток байт)</td>
+      </tr>
+      <tr>
+        <td>Конвертация чисел</td>
+        <td>строка → число</td>
+        <td>читается напрямую</td>
+      </tr>
+      <tr>
+        <td>Типичный avgParseMs</td>
+        <td>выше</td>
+        <td>ниже</td>
+      </tr>
+      <tr>
+        <td>Результат</td>
+        <td colspan="2">идентичный <code>SkeletonData</code></td>
+      </tr>
+      </tbody>
+    </table>
+    <p class="note">
+      Меньше байт + меньше работы на байт → у SKEL обычно ниже
+      <code>avgParseMs</code>, <code>maxParseMs</code> и
+      <code>droppedFrames</code>. На очень маленьких скелетах разница может
+      быть в пределах погрешности — поэтому и нужен прогон по
+      <code>instanceCount</code> итераций.
+    </p>
+  </section>
+
+  <section class="slide" data-slide="11">
+    <h2>Краткое резюме</h2>
+    <div class="card highlight">
+      <ol>
+        <li>
+          <strong>loadSpineAssets</strong> один раз грузит ассеты — сеть в
+          замер не входит.
+        </li>
+        <li>
+          <strong>warmup ×3</strong> убирает эффект cold-start / JIT перед
+          измерениями.
+        </li>
+        <li>
+          <strong>waitForNextFrame</strong> синхронизирует итерации с кадром
+          браузера и стоит вне таймера.
+        </li>
+        <li>
+          <strong>recordParseSample</strong> меряет один синхронный парс
+          через <code>performance.now()</code> и копит durations.
+        </li>
+        <li>
+          <strong>metrics</strong> переводят мс в «пропущенные кадры» и
+          worst-case блокировку относительно бюджета 60 FPS.
+        </li>
+        <li>
+          <strong>SKEL быстрее JSON</strong>: бинарь меньше, читается потоком
+          байт без промежуточного дерева и без конвертации строк в числа.
+        </li>
+      </ol>
+    </div>
+    <p class="subtitle" style="margin-top: 24px">
+      Источник: <code>src/shared/parseBenchmark.ts</code> ·
+      <code>utils.ts</code> · <code>metrics.ts</code> · проект
+      spine-json-or-skel
+    </p>
+  </section>
+</div>
+
+<div class="toolbar">
+  <button type="button" id="prev">← Назад</button>
+  <div class="slide-counter" id="counter">1 / 10</div>
+  <button type="button" id="next" class="primary">Далее →</button>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  const counter = document.getElementById("counter");
+  const prevBtn = document.getElementById("prev");
+  const nextBtn = document.getElementById("next");
+  let index = 0;
+
+  function render() {
+    slides.forEach((slide, i) => {
+      slide.classList.toggle("active", i === index);
+    });
+    counter.textContent = `${index + 1} / ${slides.length}`;
+    prevBtn.disabled = index === 0;
+    nextBtn.disabled = index === slides.length - 1;
+  }
+
+  function go(delta) {
+    index = Math.max(0, Math.min(slides.length - 1, index + delta));
+    render();
+  }
+
+  prevBtn.addEventListener("click", () => go(-1));
+  nextBtn.addEventListener("click", () => go(1));
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowRight" || event.key === "PageDown") go(1);
+    if (event.key === "ArrowLeft" || event.key === "PageUp") go(-1);
+  });
+
+  render();
+</script>
+</body>
+</html>

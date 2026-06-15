@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "benchmark:parse": "tsx src/parse-cli.ts",
-    "benchmark": "npm run benchmark:parse"
+    "benchmark": "npm run benchmark:parse",
+    "presentation": "tsx scripts/open-presentation.ts"
   },
   "dependencies": {
     "@esotericsoftware/spine-core": "4.2.43",
