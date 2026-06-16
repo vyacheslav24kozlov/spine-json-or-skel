@@ -4,7 +4,7 @@ Benchmark для сравнения производительности Spine-�
 
 ## Версии Spine
 
-Ассеты в `public/assets/` экспортированы из **Spine Editor 4.2.43** (`animation_minor.json`, `animation_minor.skel`).
+Ассеты в `public/assets/` экспортированы из **Spine Editor 4.2.43** (`animation.json`, `animation.skel`).
 
 Runtime в `package.json` должен совпадать с версией ассетов:
 

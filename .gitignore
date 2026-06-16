@@ -1,5 +1,6 @@
 # IDE and Vite specific
 /dist/
+/public/assets-gzip/
 /out-tsc/
 /tmp/
 /coverage/

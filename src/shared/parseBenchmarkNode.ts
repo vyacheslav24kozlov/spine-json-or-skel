@@ -57,7 +57,7 @@ export async function loadSpineAssetsFromDisk(
 
   if (format === "json") {
     const skeletonText = await fs.readFile(
-      path.join(assetsDir, "animation_minor.json"),
+      path.join(assetsDir, "animation.json"),
       "utf8",
     );
     return {
@@ -69,7 +69,7 @@ export async function loadSpineAssetsFromDisk(
   }
 
   const skeletonBytes = new Uint8Array(
-    await fs.readFile(path.join(assetsDir, "animation_minor.skel")),
+    await fs.readFile(path.join(assetsDir, "animation.skel")),
   );
   return {
     atlas,

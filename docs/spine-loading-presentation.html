@@ -326,14 +326,14 @@
               <td>Playback (AssetManager)</td>
             </tr>
             <tr>
-              <td><code>animation_minor.json</code></td>
+              <td><code>animation.json</code></td>
               <td>
                 Skeleton в JSON: bones, slots, skins, animations, events
               </td>
               <td>format === "json"</td>
             </tr>
             <tr>
-              <td><code>animation_minor.skel</code></td>
+              <td><code>animation.skel</code></td>
               <td>Тот же skeleton в бинарном формате Spine</td>
               <td>format === "skel"</td>
             </tr>
@@ -354,8 +354,8 @@
         <pre><code>const [atlasResponse, skeletonResponse] = await Promise.all([
   fetch("/assets/symbols.atlas"),
   fetch(format === "json"
-    ? "/assets/animation_minor.json"
-    : "/assets/animation_minor.skel"),
+    ? "/assets/animation.json"
+    : "/assets/animation.skel"),
 ]);</code></pre>
 
         <div class="grid-2">
@@ -526,7 +526,7 @@ rotate:...</code></pre>
           </ul>
         </div>
         <div class="card">
-          <h3>Пример из animation_minor.json</h3>
+          <h3>Пример из animation.json</h3>
           <pre><code>{
   "skeleton": { "hash": "...", "spine": "4.2.43" },
   "bones": [ { "name": "root" }, { "name": "main", "parent": "root" }, ... ],

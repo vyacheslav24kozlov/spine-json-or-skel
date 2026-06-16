@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Spine: playback benchmark (runPlaybackBenchmark)</title>
+  <style>
+    :root {
+      --bg: #11151c;
+      --panel: #1a2130;
+      --panel-2: #0f141d;
+      --text: #e8edf5;
+      --muted: #9aa7bd;
+      --accent: #3b82f6;
+      --accent-2: #34d399;
+      --warn: #fbbf24;
+      --border: #334055;
+      --code: #dbeafe;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    .deck {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 24px 120px;
+    }
+
+    .toolbar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding: 16px;
+      background: rgba(17, 21, 28, 0.92);
+      border-top: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+    }
+
+    .toolbar button {
+      font: inherit;
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .toolbar button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .slide-counter {
+      align-self: center;
+      color: var(--muted);
+      min-width: 80px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .slide {
+      display: none;
+      animation: fade 0.25s ease;
+    }
+
+    .slide.active {
+      display: block;
+    }
+
+    @keyframes fade {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin: 0 0 12px;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      margin: 0 0 16px;
+      color: var(--accent-2);
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      margin: 20px 0 8px;
+    }
+
+    p,
+    li {
+      color: #c9d4e6;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 1.05rem;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin: 16px 0;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #102033;
+      border: 1px solid #23486b;
+      color: #93c5fd;
+      font-size: 0.85rem;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      overflow: auto;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      color: var(--code);
+    }
+
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .flow-step {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      min-width: 130px;
+    }
+
+    .flow-step strong {
+      display: block;
+      margin-bottom: 4px;
+      color: white;
+    }
+
+    .flow-step span {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .arrow {
+      color: var(--accent);
+      font-size: 1.4rem;
+      font-weight: bold;
+    }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .compare .card h3 {
+      margin-top: 0;
+    }
+
+    .highlight {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25);
+    }
+
+    .note {
+      border-left: 4px solid var(--warn);
+      padding: 10px 14px;
+      background: rgba(251, 191, 36, 0.08);
+      border-radius: 0 8px 8px 0;
+      color: #fde68a;
+    }
+
+    .metric {
+      border-left: 4px solid var(--accent-2);
+      padding: 10px 14px;
+      background: rgba(52, 211, 153, 0.08);
+      border-radius: 0 8px 8px 0;
+      color: #bbf7d0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    th {
+      background: var(--panel-2);
+      color: var(--muted);
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+
+    .result-box {
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 860px) {
+      .grid-2,
+      .compare {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="deck">
+  <section class="slide active" data-slide="1">
+    <h1>Playback benchmark Spine</h1>
+    <p class="subtitle">
+      Как <code>runPlaybackBenchmark</code> измеряет создание runtime-инстансов и
+      отыгрывание анимаций — и почему SKEL быстрее на этапе создания
+    </p>
+    <div class="card">
+      <span class="tag">src/shared/playbackBenchmark.ts</span>
+      <span class="tag">src/shared/utils.ts</span>
+      <span class="tag">src/shared/metrics.ts</span>
+      <p>
+        Playback benchmark — это полный сценарий «как в игре»: загрузка через
+        <code>AssetManager</code>, парсинг в <code>SkeletonData</code>, массовое
+        создание <code>Skeleton + AnimationState</code>, раскладка на canvas и
+        цикл update → render в WebGL.
+      </p>
+    </div>
+    <div class="flow">
+      <div class="flow-step">
+        <strong>loadAssetsForPlayback</strong>
+        <span>atlas + json/skel + текстуры</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-step">
+        <strong>parseSkeletonData</strong>
+        <span>один раз → SkeletonData</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-step">
+        <strong>benchmarkCreateRuntimeInstances</strong>
+        <span>замер создания N инстансов</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-step">
+        <strong>runPlaybackBenchmark loop</strong>
+        <span>замер FPS / frame time</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="2">
+    <h2>runPlaybackBenchmark: общая структура</h2>
+    <pre><code>export async function runPlaybackBenchmark(options) {
+  const assets = await loadAssetsForPlayback(canvas, format);  // сеть, не в метриках
+  const skeletonData = parseSkeletonData(assets, format);      // парс 1×, не в create-метриках
+
+  const instanceCreateBenchmark = benchmarkCreateRuntimeInstances(
+    skeletonData, animationName, instanceCount,
+  );
+  const instances = instanceCreateBenchmark.instances;
+
+  // WebGL + раскладка — вне замера playback-метрик
+  const renderer = new SceneRenderer(canvas, context);
+  layoutInstances(instances, viewportWidth, viewportHeight);
+
+  // Цикл отыгрывания — замер frame time
+  while (performance.now() &lt; endAt) {
+    await requestAnimationFrame((timestamp) => {
+      frameTimesMs.push(deltaMs);
+      instances.forEach((i) => updateRuntimeInstance(i, deltaSec));
+      // clear + drawSkeleton × N
+    });
+  }
+
+  const stats = summarizeFrameTimes(frameTimesMs);
+  return { ...stats, instanceCreate: instanceCreateBenchmark };
+}</code></pre>
+    <div class="metric">
+      Два независимых блока метрик: <strong>создание инстансов</strong>
+      (<code>benchmarkCreateRuntimeInstances</code>) и <strong>playback</strong>
+      (цикл rAF + <code>summarizeFrameTimes</code>). Загрузка ассетов и
+      <code>layoutInstances</code> в отчёт не попадают.
+    </div>
+  </section>
+
+  <section class="slide" data-slide="3">
+    <h2>Подготовка: loadAssetsForPlayback</h2>
+    <p>
+      В отличие от parse-benchmark (чистый <code>fetch</code>), playback грузит
+      всё через <code>AssetManager</code> из <code>@esotericsoftware/spine-webgl</code>
+      — включая текстуры для GPU.
+    </p>
+    <pre><code>const assetManager = new AssetManager(context, "/assets/");
+assetManager.loadTextureAtlas("symbols.atlas");
+
+if (format === "json") {
+  assetManager.loadText("animation.json");
+} else {
+  assetManager.loadBinary("animation.skel");
+}
+
+while (!assetManager.isLoadingComplete()) {
+  await assetManager.loadAll();
+  await requestAnimationFrame(resolve);  // не блокируем UI
+}</code></pre>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Что возвращается</h3>
+        <p>Тот же <code>LoadedSpineAssets</code>, что и в parse-benchmark:</p>
+        <ul>
+          <li><code>atlas</code> — готовый <code>TextureAtlas</code></li>
+          <li><code>skeletonText</code> или <code>skeletonBytes</code></li>
+          <li><code>fileSizeBytes</code></li>
+        </ul>
+      </div>
+      <div class="card highlight">
+        <h3>Не входит в метрики</h3>
+        <p>
+          Сеть, декодирование WebP, инициализация WebGL-контекста — всё это
+          происходит <strong>до</strong> замеров создания и playback.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="4">
+    <h2>benchmarkCreateRuntimeInstances: что создаётся</h2>
+    <p>
+      Одна итерация — вызов <code>createRuntimeInstance</code>: из шаблона
+      <code>SkeletonData</code> строится пара «скелет + машина анимаций».
+    </p>
+    <pre><code>export function createRuntimeInstance(skeletonData, animationName) {
+  const skeleton = new Skeleton(skeletonData);
+  const animationStateData = new AnimationStateData(skeletonData);
+  const animationState = new AnimationState(animationStateData);
+  animationState.setAnimation(0, animationName, true);  // loop
+  return { skeleton, animationState };
+}</code></pre>
+    <div class="card">
+      <h3>Что происходит внутри</h3>
+      <ul>
+        <li>
+          <strong>Skeleton</strong> — копирует кости, слоты, draw order из
+          <code>SkeletonData</code>; готов к pose/transform.
+        </li>
+        <li>
+          <strong>AnimationStateData</strong> — строит таблицы микширования
+          анимаций из данных skeleton.
+        </li>
+        <li>
+          <strong>AnimationState</strong> + <code>setAnimation</code> —
+          ставит трек 0 на анимацию (например, <code>idle</code>) в loop.
+        </li>
+      </ul>
+    </div>
+    <p class="note">
+      Файл JSON/SKEL <strong>не читается</strong> при создании инстанса — работа
+      идёт только с уже распарсенным <code>SkeletonData</code>.
+    </p>
+  </section>
+
+  <section class="slide" data-slide="5">
+    <h2>benchmarkCreateRuntimeInstances: как меряется</h2>
+    <pre><code>export function benchmarkCreateRuntimeInstances(
+  skeletonData, animationName, instanceCount, warmupCount = 3,
+) {
+  // 1. Прогрев — без записи
+  for (let i = 0; i &lt; warmupCount; i += 1) {
+    createRuntimeInstance(skeletonData, animationName);
+  }
+
+  // 2. Замер каждого инстанса
+  for (let i = 0; i &lt; instanceCount; i += 1) {
+    const startedAt = performance.now();
+    instances.push(createRuntimeInstance(skeletonData, animationName));
+    const duration = performance.now() - startedAt;
+    createDurations.push(duration);
+
+    droppedFramesDuringCreate += estimateDroppedFrames(duration);
+    longestFrameGapMs = Math.max(longestFrameGapMs, duration);
+  }
+
+  return { instances, totalCreateMs, avgCreateMs, minCreateMs, maxCreateMs, ... };
+}</code></pre>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Warmup ×3</h3>
+        <p>
+          Как в parse-benchmark: прогреваем JIT и аллокатор до измерений.
+          Прогретые инстансы выбрасываются — в массив попадают только замеренные.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Один таймер на инстанс</h3>
+        <p>
+          <code>performance.now()</code> оборачивает ровно один вызов
+          <code>createRuntimeInstance</code>. Между итерациями нет
+          <code>waitForNextFrame</code> — все 100 создаются подряд синхронно.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="6">
+    <h2>Метрики создания инстансов</h2>
+    <table>
+      <thead>
+      <tr>
+        <th>Поле в UI</th>
+        <th>Поле в коде</th>
+        <th>Как считается</th>
+        <th>Смысл</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td>Всего</td>
+        <td><code>totalCreateMs</code></td>
+        <td>sum(createDurations)</td>
+        <td>Суммарная стоимость N инстансов</td>
+      </tr>
+      <tr>
+        <td>Среднее на инстанс</td>
+        <td><code>avgCreateMs</code></td>
+        <td>total / instanceCount</td>
+        <td>Типичная цена одного <code>new Skeleton + AnimationState</code></td>
+      </tr>
+      <tr>
+        <td>Min / Max</td>
+        <td><code>minCreateMs</code> / <code>maxCreateMs</code></td>
+        <td>min/max по массиву</td>
+        <td>Разброс: GC, шум таймера</td>
+      </tr>
+      <tr>
+        <td>Просадки при создании</td>
+        <td><code>droppedFramesDuringCreate</code></td>
+        <td>Σ estimateDroppedFrames(duration)</td>
+        <td>Сколько кадров 60 FPS «съела» синхронная работа</td>
+      </tr>
+      <tr>
+        <td>Макс. блокировка кадра</td>
+        <td><code>longestFrameGapMs</code></td>
+        <td>max(duration)</td>
+        <td>Worst-case фриз от одного инстанса</td>
+      </tr>
+      </tbody>
+    </table>
+    <pre><code>estimateDroppedFrames(blockingMs):
+  if blockingMs ≤ 16.67 ms → 0
+  else floor(blockingMs / 16.67)</code></pre>
+    <div class="compare result-box" style="margin-top: 16px">
+      <div class="card">
+        <h3>JSON — 100 инстансов</h3>
+        <ul>
+          <li>Всего: <strong>4.00 ms</strong></li>
+          <li>Среднее: <strong>0.04 ms</strong></li>
+          <li>Min / Max: 0.00 / 0.20 ms</li>
+          <li>Просадки: 0</li>
+        </ul>
+      </div>
+      <div class="card highlight">
+        <h3>SKEL — 100 инстансов</h3>
+        <ul>
+          <li>Всего: <strong>2.80 ms</strong></li>
+          <li>Среднее: <strong>0.03 ms</strong></li>
+          <li>Min / Max: 0.00 / 0.50 ms</li>
+          <li>Просадки: 0</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">
+      При таких значениях просадки = 0 у обоих: ни один инстанс не блокирует
+      главный поток дольше бюджета кадра (~16.67 ms).
+    </p>
+  </section>
+
+  <section class="slide" data-slide="7">
+    <h2>Цикл playback: что происходит каждый кадр</h2>
+    <p>
+      После создания инстансов запускается цикл на <code>durationSec</code>
+      секунд. Каждый кадр — полный update + render всех N скелетов.
+    </p>
+    <pre><code>requestAnimationFrame((timestamp) => {
+  const deltaSec = (timestamp - previousTimestamp) / 1000;
+  frameTimesMs.push(deltaSec * 1000);           // ← метрика playback
+
+  instances.forEach((instance) => {
+    updateRuntimeInstance(instance, deltaSec);
+  });
+
+  gl.clear(COLOR_BUFFER_BIT);
+  renderer.begin();
+  instances.forEach((instance) => {
+    renderer.drawSkeleton(instance.skeleton, true);
+  });
+  renderer.end();
+});</code></pre>
+    <pre><code>export function updateRuntimeInstance(instance, deltaSec) {
+  instance.animationState.update(deltaSec);       // продвижение таймлайна
+  instance.animationState.apply(instance.skeleton); // ключи → pose
+  instance.skeleton.updateWorldTransform(Physics.update);
+}</code></pre>
+    <div class="card">
+      <h3>Что входит в frame time</h3>
+      <ul>
+        <li>Update всех <code>AnimationState</code> и world transform</li>
+        <li>WebGL clear + <code>drawSkeleton</code> × instanceCount</li>
+        <li>Накладные расходы rAF и <code>renderer.resize</code></li>
+      </ul>
+      <p>
+        Формат JSON/SKEL в этом цикле <strong>не участвует</strong> — инстансы
+        уже созданы, отличается только то, каким парсером был построен исходный
+        <code>SkeletonData</code>.
+      </p>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="8">
+    <h2>Метрики playback (summarizeFrameTimes)</h2>
+    <pre><code>const TARGET_FPS = 60;
+const FRAME_BUDGET_MS = 1000 / 60;  // ≈ 16.67 ms
+
+export function summarizeFrameTimes(frameTimesMs) {
+  const avgFrameMs = sum(frameTimesMs) / length;
+  const sorted = [...frameTimesMs].sort();
+  const p95Index = floor(length * 0.95);
+
+  return {
+    avgFps: 1000 / avgFrameMs,
+    minFps: 1000 / max(frameTimesMs),   // худший кадр → минимальный FPS
+    droppedFrames: count(frameMs > FRAME_BUDGET_MS * 1.5),
+    frameTimeP95Ms: sorted[p95Index],
+  };
+}</code></pre>
+    <table>
+      <thead>
+      <tr>
+        <th>Поле в UI</th>
+        <th>Поле в коде</th>
+        <th>Смысл</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td>Средний FPS</td>
+        <td><code>avgFps</code></td>
+        <td>1000 / среднее время кадра за весь прогон</td>
+      </tr>
+      <tr>
+        <td>Минимальный FPS</td>
+        <td><code>minFps</code></td>
+        <td>Обратное от <strong>самого долгого</strong> кадра (worst spike)</td>
+      </tr>
+      <tr>
+        <td>Кадров</td>
+        <td><code>totalFrames</code></td>
+        <td>Сколько rAF-итераций уложилось в <code>durationSec</code></td>
+      </tr>
+      <tr>
+        <td>Просадки (&gt;150% budget)</td>
+        <td><code>droppedFrames</code></td>
+        <td>Кадры длиннее 25 ms (1.5 × 16.67) — заметные лаги</td>
+      </tr>
+      <tr>
+        <td>P95 frame time</td>
+        <td><code>frameTimeP95Ms</code></td>
+        <td>95% кадров быстрее этого значения — устойчивость, не только avg</td>
+      </tr>
+      </tbody>
+    </table>
+    <p class="metric">
+      Playback-метрики отвечают на вопрос: «выдержит ли сцена N одновременных
+      анимаций при 60 FPS?» Создание инстансов — отдельный одноразовый cost при
+      спавне.
+    </p>
+  </section>
+
+  <section class="slide" data-slide="9">
+    <h2>Два замера — одна сессия, разные вопросы</h2>
+    <div class="compare">
+      <div class="card">
+        <h3>Создание инстансов</h3>
+        <p><strong>Когда:</strong> один раз в начале, до render loop</p>
+        <p><strong>Вопрос:</strong> сколько стоит заспавнить N копий?</p>
+        <p><strong>Таймер:</strong> <code>performance.now()</code> на каждый инстанс</p>
+        <p><strong>Блокировка:</strong> синхронная, подряд — может фризить UI</p>
+        <p><strong>Зависит от формата:</strong> косвенно — через вид <code>SkeletonData</code></p>
+      </div>
+      <div class="card">
+        <h3>Playback (отыгрывание)</h3>
+        <p><strong>Когда:</strong> каждый кадр в течение <code>durationSec</code></p>
+        <p><strong>Вопрос:</strong> какой FPS при N анимациях на GPU?</p>
+        <p><strong>Таймер:</strong> delta между rAF timestamps</p>
+        <p><strong>Блокировка:</strong> распределена по кадрам</p>
+        <p><strong>Зависит от формата:</strong> практически нет — только instanceCount и GPU</p>
+      </div>
+    </div>
+    <div class="flow">
+      <div class="flow-step">
+        <strong>parseSkeletonData</strong>
+        <span>JSON или SKEL → SkeletonData</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-step">
+        <strong>create × N</strong>
+        <span>клонируем из SkeletonData</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-step">
+        <strong>layoutInstances</strong>
+        <span>сетка на canvas</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-step">
+        <strong>update + draw × frames</strong>
+        <span>непрерывный playback</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="10">
+    <h2>Почему SKEL быстрее создаёт 100 инстансов?</h2>
+    <p>
+      Ваши результаты: JSON <strong>4.00 ms</strong> vs SKEL <strong>2.80 ms</strong>
+      (~<strong>1.43×</strong>, экономия 1.2 ms на 100 инстансов). Главный ответ:
+    </p>
+    <div class="card highlight">
+      <h3>При создании инстанса файл не парсится повторно</h3>
+      <p>
+        Разница идёт не от «SKEL быстрее читает .skel в цикле», а от того,
+        <strong>какой SkeletonData уже лежит в памяти</strong> после
+        <code>parseSkeletonData</code> — а он построен разными парсерами.
+      </p>
+    </div>
+    <div class="compare">
+      <div class="card">
+        <h3>Цепочка для JSON</h3>
+        <pre><code>animation.json (текст)
+  → SkeletonJson.readSkeletonData()
+  → SkeletonData (из JS-дерева)
+  → new Skeleton(skeletonData) × 100
+  → new AnimationStateData(skeletonData) × 100</code></pre>
+        <ul>
+          <li>Парсер прошёл через <code>JSON.parse</code> и обход объектов</li>
+          <li>Больше промежуточных строк и объектов при построении данных</li>
+          <li><code>SkeletonData</code> может быть «тяжелее» для клонирования</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Цепочка для SKEL</h3>
+        <pre><code>animation.skel (байты)
+  → SkeletonBinary.readSkeletonData()
+  → SkeletonData (прямое чтение)
+  → new Skeleton(skeletonData) × 100
+  → new AnimationStateData(skeletonData) × 100</code></pre>
+        <ul>
+          <li>Бинарь меньше (~9.5 KB vs ~21 KB)</li>
+          <li>Меньше аллокаций при первичном парсинге</li>
+          <li>Компактнее граф данных → быстрее обход при <code>new Skeleton</code></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="11">
+    <h2>Детали: почему разница небольшая, но заметная</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3>1. Наследие от парсинга</h3>
+        <p>
+          <code>createRuntimeInstance</code> копирует кости, слоты, ссылки на
+          анимации из <code>SkeletonData</code>. Если JSON-парсер оставил более
+          фрагментированный граф (строки имён, больше мелких объектов), каждое
+          клонирование чуть дороже.
+        </p>
+      </div>
+      <div class="card">
+        <h3>2. Масштаб эффекта</h3>
+        <p>
+          Разница ~<strong>0.01 ms</strong> на инстанс — это доли процента от
+          бюджета кадра. На 100 инстансах накапливается в ~1.2 ms. На 10 000
+          спавнов в одном кадре уже ~1 с — формат начинает иметь значение.
+        </p>
+      </div>
+      <div class="card">
+        <h3>3. Шум измерений</h3>
+        <p>
+          При субмиллисекундных таймингах важен разброс: у SKEL
+          <code>max = 0.50 ms</code>, у JSON <code>max = 0.20 ms</code> — SKEL
+          быстрее в среднем, но с большим spike. Это GC или квантование
+          <code>performance.now()</code>, а не «SKEL всегда стабильнее».
+        </p>
+      </div>
+      <div class="card">
+        <h3>4. Playback — паритет</h3>
+        <p>
+          После создания инстансы идентичны по логике. FPS и P95 frame time
+          должны совпадать при одном <code>instanceCount</code>: в цикле нет
+          ветвления JSON/SKEL, только update + WebGL draw.
+        </p>
+      </div>
+    </div>
+    <p class="note">
+      Итог: SKEL выигрывает на создании потому, что <strong>до замера</strong>
+      skeleton уже распарсен в более «лёгкий» <code>SkeletonData</code>, и
+      клонирование <code>Skeleton + AnimationState</code> обходится дешевле.
+      Это следствие преимущества бинарного формата на этапе
+      <code>readSkeletonData</code>, а не отдельной магии SKEL при
+      <code>new Skeleton()</code>.
+    </p>
+  </section>
+
+  <section class="slide" data-slide="12">
+    <h2>Краткое резюме</h2>
+    <div class="card highlight">
+      <ol>
+        <li>
+          <strong>runPlaybackBenchmark</strong> — загрузка (AssetManager) → парс
+          → замер создания N инстансов → WebGL playback loop.
+        </li>
+        <li>
+          <strong>benchmarkCreateRuntimeInstances</strong> — warmup ×3, затем
+          <code>performance.now()</code> на каждый
+          <code>createRuntimeInstance</code>; метрики: total/avg/min/max,
+          droppedFramesDuringCreate, longestFrameGapMs.
+        </li>
+        <li>
+          <strong>Playback-метрики</strong> — delta rAF → avgFps, minFps
+          (от max frame), droppedFrames (&gt;25 ms), frameTimeP95Ms.
+        </li>
+        <li>
+          <strong>JSON 4.00 ms vs SKEL 2.80 ms</strong> — файлы в цикле не
+          читаются; SKEL быстрее, потому что его <code>SkeletonData</code>
+          построен компактнее после бинарного парсинга, и клонирование
+          инстансов дешевле.
+        </li>
+        <li>
+          Разница мала на одном инстансе (~0.01 ms), но масштабируется с
+          количеством спавнов; при playback формат почти не влияет.
+        </li>
+      </ol>
+    </div>
+    <p class="subtitle" style="margin-top: 24px">
+      Источник: <code>src/shared/playbackBenchmark.ts</code> ·
+      <code>utils.ts</code> · <code>metrics.ts</code> · проект spine-json-or-skel
+    </p>
+  </section>
+</div>
+
+<div class="toolbar">
+  <button type="button" id="prev">← Назад</button>
+  <div class="slide-counter" id="counter">1 / 12</div>
+  <button type="button" id="next" class="primary">Далее →</button>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  const counter = document.getElementById("counter");
+  const prevBtn = document.getElementById("prev");
+  const nextBtn = document.getElementById("next");
+  let index = 0;
+
+  function render() {
+    slides.forEach((slide, i) => {
+      slide.classList.toggle("active", i === index);
+    });
+    counter.textContent = `${index + 1} / ${slides.length}`;
+    prevBtn.disabled = index === 0;
+    nextBtn.disabled = index === slides.length - 1;
+  }
+
+  function go(delta) {
+    index = Math.max(0, Math.min(slides.length - 1, index + delta));
+    render();
+  }
+
+  prevBtn.addEventListener("click", () => go(-1));
+  nextBtn.addEventListener("click", () => go(1));
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowRight" || event.key === "PageDown") go(1);
+    if (event.key === "ArrowLeft" || event.key === "PageUp") go(-1);
+  });
+
+  render();
+</script>
+</body>
+</html>

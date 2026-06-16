@@ -32,9 +32,9 @@ async function loadAssetsForPlayback(
   assetManager.loadTextureAtlas("symbols.atlas");
 
   if (format === "json") {
-    assetManager.loadText("animation_minor.json");
+    assetManager.loadText("animation.json");
   } else {
-    assetManager.loadBinary("animation_minor.skel");
+    assetManager.loadBinary("animation.skel");
   }
 
   while (!assetManager.isLoadingComplete()) {
@@ -50,7 +50,7 @@ async function loadAssetsForPlayback(
 
   const atlas = assetManager.require("symbols.atlas");
   if (format === "json") {
-    const skeletonText = assetManager.require("animation_minor.json") as string;
+    const skeletonText = assetManager.require("animation.json") as string;
     return {
       atlas,
       skeletonBytes: new Uint8Array(),
@@ -60,7 +60,7 @@ async function loadAssetsForPlayback(
   }
 
   const skeletonBytes = assetManager.require(
-    "animation_minor.skel",
+    "animation.skel",
   ) as Uint8Array;
   return {
     atlas,

@@ -1,0 +1,273 @@
+<!DOCTYPE html><html lang='ru'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>GZIP JSON vs SKEL</title><style>
+      :root {
+        --bg: #11151c;
+        --panel: #1a2130;
+        --panel-2: #0f141d;
+        --text: #e8edf5;
+        --muted: #9aa7bd;
+        --accent: #3b82f6;
+        --accent-2: #34d399;
+        --warn: #fbbf24;
+        --border: #334055;
+        --code: #dbeafe;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.55;
+      }
+
+      .deck {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px 24px 120px;
+      }
+
+      .toolbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        padding: 16px;
+        background: rgba(17, 21, 28, 0.92);
+        border-top: 1px solid var(--border);
+        backdrop-filter: blur(8px);
+      }
+
+      .toolbar button {
+        font: inherit;
+        padding: 10px 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      .toolbar button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+      }
+
+      .slide-counter {
+        align-self: center;
+        color: var(--muted);
+        min-width: 80px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .slide {
+        display: none;
+        animation: fade 0.25s ease;
+      }
+
+      .slide.active {
+        display: block;
+      }
+
+      @keyframes fade {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+      }
+
+      h1 {
+        font-size: 2rem;
+        margin: 0 0 12px;
+      }
+
+      h2 {
+        font-size: 1.5rem;
+        margin: 0 0 16px;
+        color: var(--accent-2);
+      }
+
+      h3 {
+        font-size: 1.05rem;
+        margin: 20px 0 8px;
+      }
+
+      p,
+      li {
+        color: #c9d4e6;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        font-size: 1.05rem;
+        margin-bottom: 24px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 18px;
+        margin: 16px 0;
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #102033;
+        border: 1px solid #23486b;
+        color: #93c5fd;
+        font-size: 0.85rem;
+        margin-right: 8px;
+        margin-bottom: 8px;
+      }
+
+      pre {
+        margin: 0;
+        padding: 14px 16px;
+        border-radius: 10px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        overflow: auto;
+        font-size: 0.88rem;
+        line-height: 1.45;
+      }
+
+      code {
+        font-family: Consolas, "Courier New", monospace;
+        color: var(--code);
+      }
+
+      .flow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin: 16px 0;
+      }
+
+      .flow-step {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        min-width: 130px;
+      }
+
+      .flow-step strong {
+        display: block;
+        margin-bottom: 4px;
+        color: white;
+      }
+
+      .flow-step span {
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .arrow {
+        color: var(--accent);
+        font-size: 1.4rem;
+        font-weight: bold;
+      }
+
+      .compare {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .compare .card h3 {
+        margin-top: 0;
+      }
+
+      .highlight {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25);
+      }
+
+      .note {
+        border-left: 4px solid var(--warn);
+        padding: 10px 14px;
+        background: rgba(251, 191, 36, 0.08);
+        border-radius: 0 8px 8px 0;
+        color: #fde68a;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 10px 12px;
+        text-align: left;
+      }
+
+      th {
+        background: var(--panel-2);
+        color: var(--muted);
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+
+      @media (max-width: 860px) {
+        .grid-2,
+        .compare {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style></head><body>
+<div class='deck'>
+<section class='slide active'><h1>GZIP и Spine: JSON vs SKEL</h1><p class='subtitle'>Почему gzip не превращает JSON в SKEL</p><div class='card'>GZIP уменьшает размер передачи по сети, но не убирает JSON.parse().</div></section>
+<section class='slide'><h2>Что такое gzip?</h2><p>GZIP — алгоритм сжатия. Во время передачи JSON становится бинарным потоком, но после загрузки браузер автоматически распаковывает его.</p><pre><code>JSON → gzip → сеть → gunzip → JSON string</code></pre></section>
+<section class='slide'><h2>JSON + gzip</h2><pre><code>response.text()
+↓
+JSON.parse()
+↓
+JS Object Tree
+↓
+Spine Objects</code></pre><p class='note'>Главный недостаток JSON остаётся: JSON.parse().</p></section>
+<section class='slide'><h2>SKEL + gzip</h2><pre><code>response.arrayBuffer()
+↓
+Uint8Array
+↓
+SkeletonBinary.readSkeletonData()</code></pre><p>Нет промежуточного дерева JS объектов.</p></section>
+<section class='slide'><h2>Что решает gzip?</h2><table><tr><th>Проблема</th><th>GZIP</th></tr><tr><td>Размер сети</td><td>✅</td></tr><tr><td>JSON.parse</td><td>❌</td></tr><tr><td>GC</td><td>❌</td></tr><tr><td>CPU</td><td>❌</td></tr></table></section>
+<section class='slide'><h2>Что происходит в твоем коде?</h2><pre><code>await response.text()</code></pre><p>Браузер уже сделал gunzip и UTF-8 decode.</p><pre><code>await response.arrayBuffer()</code></pre><p>Браузер возвращает уже распакованные байты.</p></section>
+<section class='slide'><h2>Размеры после gzip</h2><table><tr><th>Формат</th><th>Без gzip</th><th>С gzip</th></tr><tr><td>JSON</td><td>1.5 MB</td><td>250 KB</td></tr><tr><td>SKEL</td><td>800 KB</td><td>500 KB</td></tr></table><p class='note'>JSON часто сжимается лучше из-за повторяющихся ключей.</p></section>
+<section class='slide'><h2>Итог</h2><div class='card highlight'><ol><li>GZIP влияет только на сеть.</li><li>После распаковки JSON снова текст.</li><li>SKEL всё ещё требует меньше CPU.</li><li>После SkeletonData runtime одинаков.</li></ol></div></section>
+</div>
+<div class="toolbar"><button id="prev">← Назад</button><div class="slide-counter" id="counter"></div><button id="next" class="primary">Далее →</button></div>
+<script>const s=[...document.querySelectorAll('.slide')];let i=0;function r(){s.forEach((e,n)=>e.classList.toggle('active',n===i));counter.textContent=(i+1)+' / '+s.length;prev.disabled=i===0;next.disabled=i===s.length-1;} prev.onclick=()=>{i=Math.max(0,i-1);r();};next.onclick=()=>{i=Math.min(s.length-1,i+1);r();};window.onkeydown=e=>{if(e.key==='ArrowRight')next.click();if(e.key==='ArrowLeft')prev.click();};r();</script>
+</body></html>

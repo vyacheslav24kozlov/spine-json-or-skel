@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "benchmark:parse": "tsx src/parse-cli.ts",
+    "gzip:assets": "tsx src/gzip-assets-cli.ts",
     "benchmark": "npm run benchmark:parse",
     "presentation": "tsx scripts/open-presentation.ts"
   },

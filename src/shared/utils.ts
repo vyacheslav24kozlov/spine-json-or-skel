@@ -26,8 +26,8 @@ export async function loadSpineAssets(
     fetch("/assets/symbols.atlas"),
     fetch(
       format === "json"
-        ? "/assets/animation_minor.json"
-        : "/assets/animation_minor.skel",
+        ? "/assets/animation.json"
+        : "/assets/animation.skel",
     ),
   ]);
 
