@@ -1,9 +1,12 @@
 import type { ParseBenchmarkResult, SkeletonFormat } from "../types";
 import { FRAME_BUDGET_MS } from "./metrics";
+import { spineAssetsConfig } from "./spineConfig";
 import {
   loadSpineAssets,
   parseSkeletonData,
   recordParseSample,
+  totalFileSizeBytes,
+  type LoadedSpineAsset,
   type ParseSampleAccumulator,
 } from "./utils";
 
@@ -11,6 +14,7 @@ export interface ParseBenchmarkOptions {
   format: SkeletonFormat;
   instanceCount: number;
   warmupCount?: number;
+  onProgress?: (done: number, total: number, skeletonId: string) => void;
 }
 
 async function waitForNextFrame(): Promise<number> {
@@ -19,17 +23,26 @@ async function waitForNextFrame(): Promise<number> {
   });
 }
 
+function warmupParse(
+  assets: LoadedSpineAsset[],
+  format: SkeletonFormat,
+  warmupCount: number,
+): void {
+  for (let index = 0; index < warmupCount; index += 1) {
+    for (const asset of assets) {
+      parseSkeletonData(asset, format);
+    }
+  }
+}
+
 export async function runParseBenchmark(
   options: ParseBenchmarkOptions,
 ): Promise<ParseBenchmarkResult> {
-  const { format, instanceCount, warmupCount = 3 } = options;
-  const assets = await loadSpineAssets(format);
+  const { format, instanceCount, warmupCount = 3, onProgress } = options;
+  const assets = await loadSpineAssets(format, spineAssetsConfig.skeletons);
+  const totalSamples = assets.length * instanceCount;
 
-  for (let index = 0; index < warmupCount; index += 1) {
-    parseSkeletonData(assets, format);
-  }
-
-  // Синхронизуемся с фреймом браузера перед тестом
+  warmupParse(assets, format, warmupCount);
   await waitForNextFrame();
 
   const acc: ParseSampleAccumulator = {
@@ -38,10 +51,13 @@ export async function runParseBenchmark(
     longestFrameGapMs: 0,
   };
 
-  for (let index = 0; index < instanceCount; index += 1) {
-    recordParseSample(assets, format, acc);
-
-    // Добавить ожидание между итерациями для более реалистичного тестирования
+  let done = 0;
+  for (let round = 0; round < instanceCount; round += 1) {
+    for (const asset of assets) {
+      recordParseSample(asset, format, acc);
+      done += 1;
+      onProgress?.(done, totalSamples, asset.id);
+    }
     await waitForNextFrame();
   }
 
@@ -50,9 +66,10 @@ export async function runParseBenchmark(
   return {
     format,
     instanceCount,
-    fileSizeBytes: assets.fileSizeBytes,
+    skeletonCount: assets.length,
+    fileSizeBytes: totalFileSizeBytes(assets),
     totalParseMs,
-    avgParseMs: totalParseMs / instanceCount,
+    avgParseMs: totalParseMs / acc.durations.length,
     minParseMs: Math.min(...acc.durations),
     maxParseMs: Math.max(...acc.durations),
     droppedFramesDuringParse: acc.droppedFrames,

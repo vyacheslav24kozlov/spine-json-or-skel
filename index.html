@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:,">
     <title>Spine JSON vs SKEL Benchmark</title>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
@@ -11,25 +12,19 @@
       <header>
         <h1>Spine JSON vs SKEL Benchmark</h1>
         <p>
-          Сравнение загрузки и воспроизведения 100 копий
-          <code>animation</code>
+          Сравнение загрузки, парсинга и воспроизведения всех Spine-ассетов
+          из <code>public/assets</code>
         </p>
       </header>
 
       <section class="controls">
         <label>
-          Копий:
-          <input id="instance-count" type="number" min="1" max="500" value="100" />
+          Копий на скелет:
+          <input id="instance-count" type="number" min="1" max="100" value="4" />
         </label>
         <label>
-          Анимация:
-          <select id="animation-name">
-            <option value="idle">idle</option>
-            <option value="win">win</option>
-            <option value="dropped">dropped</option>
-            <option value="idle_collect">idle_collect</option>
-            <option value="win_bonus_game">win_bonus_game</option>
-          </select>
+          Группа анимаций:
+          <select id="animation-group"></select>
         </label>
         <label>
           Длительность playback (с):

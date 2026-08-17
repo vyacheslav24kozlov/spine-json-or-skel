@@ -52,7 +52,7 @@ header p {
 
 .controls input,
 .controls select {
-  min-width: 120px;
+  min-width: 160px;
   padding: 8px 10px;
   border: 1px solid #334055;
   border-radius: 8px;

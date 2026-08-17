@@ -5,6 +5,10 @@ import {
   formatFps,
   formatMs,
 } from "./shared/metrics";
+import {
+  formatAnimationGroupLabel,
+  spineAssetsConfig,
+} from "./shared/spineConfig";
 import type {
   BenchmarkSuiteResult,
   InstanceCreateBenchmarkResult,
@@ -17,11 +21,24 @@ const resultsEl = document.querySelector<HTMLDivElement>("#results")!;
 const runButton = document.querySelector<HTMLButtonElement>("#run-benchmark")!;
 const instanceCountInput =
   document.querySelector<HTMLInputElement>("#instance-count")!;
-const animationNameSelect =
-  document.querySelector<HTMLSelectElement>("#animation-name")!;
+const animationGroupSelect =
+  document.querySelector<HTMLSelectElement>("#animation-group")!;
 const playbackDurationInput =
   document.querySelector<HTMLInputElement>("#playback-duration")!;
 const canvas = document.querySelector<HTMLCanvasElement>("#canvas")!;
+
+function populateAnimationGroups(): void {
+  animationGroupSelect.replaceChildren();
+  for (const group of spineAssetsConfig.animationGroups) {
+    if (group.entries.length === 0) {
+      continue;
+    }
+    const option = document.createElement("option");
+    option.value = String(group.id);
+    option.textContent = formatAnimationGroupLabel(group);
+    animationGroupSelect.append(option);
+  }
+}
 
 function setStatus(text: string, state: "idle" | "running" | "done" | "error") {
   statusEl.textContent = text;
@@ -49,9 +66,12 @@ function renderMetricCard(
 
 function renderParseCard(result: ParseBenchmarkResult): string {
   return renderMetricCard(`Парсинг — ${result.format.toUpperCase()}`, [
-    ["Размер файла", formatBytes(result.fileSizeBytes)],
+    ["Скелетов", String(result.skeletonCount)],
+    ["Размер всех файлов", formatBytes(result.fileSizeBytes)],
+    ["Копий на скелет", String(result.instanceCount)],
+    ["Всего парсингов", String(result.skeletonCount * result.instanceCount)],
     ["Всего", formatMs(result.totalParseMs)],
-    ["Среднее на копию", formatMs(result.avgParseMs)],
+    ["Среднее на парсинг", formatMs(result.avgParseMs)],
     ["Min / Max", `${formatMs(result.minParseMs)} / ${formatMs(result.maxParseMs)}`],
     ["Просадки при парсинге", String(result.droppedFramesDuringParse)],
     ["Макс. блокировка кадра", formatMs(result.longestFrameGapMs)],
@@ -60,7 +80,9 @@ function renderParseCard(result: ParseBenchmarkResult): string {
 
 function renderPlaybackCard(result: PlaybackBenchmarkResult): string {
   return renderMetricCard(`Playback — ${result.format.toUpperCase()}`, [
-    ["Анимация", result.animationName],
+    ["Группа", result.animationName],
+    ["Скелетов", String(result.skeletonCount)],
+    ["Инстансов", String(result.instanceCount)],
     ["Средний FPS", formatFps(result.avgFps)],
     ["Минимальный FPS", formatFps(result.minFps)],
     ["Кадров", String(result.totalFrames)],
@@ -71,7 +93,8 @@ function renderPlaybackCard(result: PlaybackBenchmarkResult): string {
 
 function renderInstanceCreateCard(result: InstanceCreateBenchmarkResult): string {
   return renderMetricCard(`Создание инстансов — ${result.format.toUpperCase()}`, [
-    ["Анимация", result.animationName],
+    ["Группа", result.animationName],
+    ["Скелетов", String(result.skeletonCount)],
     ["Инстансов", String(result.instanceCount)],
     ["Всего", formatMs(result.totalCreateMs)],
     ["Среднее на инстанс", formatMs(result.avgCreateMs)],
@@ -183,23 +206,36 @@ function renderResults(
 
 async function runFullBenchmark(): Promise<void> {
   const instanceCount = Number(instanceCountInput.value);
-  const animationName = animationNameSelect.value;
+  const animationGroupId = Number(animationGroupSelect.value);
   const playbackDuration = Number(playbackDurationInput.value);
+  const skeletonCount = spineAssetsConfig.skeletons.length;
 
   runButton.disabled = true;
   resultsEl.innerHTML = "";
 
   try {
-    setStatus(`JSON: парсинг ${instanceCount} копий...`, "running");
+    setStatus(`JSON: парсинг ${skeletonCount} скелетов...`, "running");
     const jsonParse = await runParseBenchmark({
       format: "json",
       instanceCount,
+      onProgress: (done, total, skeletonId) => {
+        setStatus(
+          `JSON: парсинг ${skeletonId} (${done}/${total})...`,
+          "running",
+        );
+      },
     });
 
-    setStatus(`SKEL: парсинг ${instanceCount} копий...`, "running");
+    setStatus(`SKEL: парсинг ${skeletonCount} скелетов...`, "running");
     const skelParse = await runParseBenchmark({
       format: "skel",
       instanceCount,
+      onProgress: (done, total, skeletonId) => {
+        setStatus(
+          `SKEL: парсинг ${skeletonId} (${done}/${total})...`,
+          "running",
+        );
+      },
     });
 
     setStatus("JSON: playback...", "running");
@@ -207,7 +243,7 @@ async function runFullBenchmark(): Promise<void> {
       canvas,
       format: "json",
       instanceCount,
-      animationName,
+      animationGroupId,
       durationSec: playbackDuration,
     });
 
@@ -216,7 +252,7 @@ async function runFullBenchmark(): Promise<void> {
       canvas,
       format: "skel",
       instanceCount,
-      animationName,
+      animationGroupId,
       durationSec: playbackDuration,
     });
 
@@ -244,4 +280,8 @@ runButton.addEventListener("click", () => {
   void runFullBenchmark();
 });
 
-setStatus("Готов к запуску", "idle");
+populateAnimationGroups();
+setStatus(
+  `Готов к запуску · ${spineAssetsConfig.skeletons.length} скелетов`,
+  "idle",
+);

@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsx src/generate-spine-config.ts && tsc && vite build",
     "preview": "vite preview",
     "benchmark:parse": "tsx src/parse-cli.ts",
     "gzip:assets": "tsx src/gzip-assets-cli.ts",
+    "generate:spine-config": "tsx src/generate-spine-config.ts",
     "benchmark": "npm run benchmark:parse",
     "presentation": "tsx scripts/open-presentation.ts"
   },

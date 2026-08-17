@@ -8,33 +8,47 @@ import { Physics, Vector2 } from "@esotericsoftware/spine-core";
 import type { PlaybackBenchmarkResult, SkeletonFormat } from "../types";
 import { summarizeFrameTimes } from "./metrics";
 import {
+  formatAnimationGroupLabel,
+  getAnimationGroup,
+  getSkeletonsForGroup,
+} from "./spineConfig";
+import {
   benchmarkCreateRuntimeInstances,
   parseSkeletonData,
   updateRuntimeInstance,
-  type LoadedSpineAssets,
+  type LoadedSpineAsset,
   type RuntimeInstance,
+  type SkeletonPlaybackSpec,
 } from "./utils";
 
 export interface PlaybackBenchmarkOptions {
   canvas: HTMLCanvasElement;
   format: SkeletonFormat;
   instanceCount: number;
-  animationName: string;
+  animationGroupId: number;
   durationSec: number;
 }
 
 async function loadAssetsForPlayback(
-  canvas: HTMLCanvasElement,
+  context: ManagedWebGLRenderingContext,
   format: SkeletonFormat,
-): Promise<LoadedSpineAssets> {
-  const context = new ManagedWebGLRenderingContext(canvas);
+  animationGroupId: number,
+): Promise<LoadedSpineAsset[]> {
+  const groupItems = getSkeletonsForGroup(animationGroupId);
+  const skeletons = groupItems.map((item) => item.skeleton);
   const assetManager = new AssetManager(context, "/assets/");
-  assetManager.loadTextureAtlas("symbols.atlas");
+  const uniqueAtlasPaths = [...new Set(skeletons.map((item) => item.atlasPath))];
 
-  if (format === "json") {
-    assetManager.loadText("animation.json");
-  } else {
-    assetManager.loadBinary("animation.skel");
+  for (const atlasPath of uniqueAtlasPaths) {
+    assetManager.loadTextureAtlas(atlasPath);
+  }
+
+  for (const skeleton of skeletons) {
+    if (format === "json") {
+      assetManager.loadText(skeleton.jsonPath);
+    } else {
+      assetManager.loadBinary(skeleton.skelPath);
+    }
   }
 
   while (!assetManager.isLoadingComplete()) {
@@ -43,31 +57,31 @@ async function loadAssetsForPlayback(
   }
 
   if (assetManager.hasErrors()) {
-    throw new Error(
-      Object.values(assetManager.getErrors()).join("\n"),
-    );
+    throw new Error(Object.values(assetManager.getErrors()).join("\n"));
   }
 
-  const atlas = assetManager.require("symbols.atlas");
-  if (format === "json") {
-    const skeletonText = assetManager.require("animation.json") as string;
+  return skeletons.map((skeleton) => {
+    const atlas = assetManager.require(skeleton.atlasPath);
+    if (format === "json") {
+      const skeletonText = assetManager.require(skeleton.jsonPath) as string;
+      return {
+        id: skeleton.id,
+        atlas,
+        skeletonBytes: new Uint8Array(),
+        skeletonText,
+        fileSizeBytes: new TextEncoder().encode(skeletonText).length,
+      };
+    }
+
+    const skeletonBytes = assetManager.require(skeleton.skelPath) as Uint8Array;
     return {
+      id: skeleton.id,
       atlas,
-      skeletonBytes: new Uint8Array(),
-      skeletonText,
-      fileSizeBytes: new TextEncoder().encode(skeletonText).length,
+      skeletonBytes,
+      skeletonText: "",
+      fileSizeBytes: skeletonBytes.byteLength,
     };
-  }
-
-  const skeletonBytes = assetManager.require(
-    "animation.skel",
-  ) as Uint8Array;
-  return {
-    atlas,
-    skeletonBytes,
-    skeletonText: "",
-    fileSizeBytes: skeletonBytes.byteLength,
-  };
+  });
 }
 
 function layoutInstances(
@@ -79,7 +93,6 @@ function layoutInstances(
   const rows = Math.ceil(instances.length / columns);
   const cellWidth = viewportWidth / columns;
   const cellHeight = viewportHeight / rows;
-  const scale = Math.min(cellWidth, cellHeight) / 220;
   const boundsOffset = new Vector2();
   const boundsSize = new Vector2();
 
@@ -89,6 +102,16 @@ function layoutInstances(
     const skeleton = instance.skeleton;
 
     skeleton.setToSetupPose();
+    skeleton.scaleX = 1;
+    skeleton.scaleY = 1;
+    skeleton.updateWorldTransform(Physics.update);
+    skeleton.getBounds(boundsOffset, boundsSize);
+
+    const padding = 0.85;
+    const scaleX = boundsSize.x > 0 ? (cellWidth * padding) / boundsSize.x : 1;
+    const scaleY = boundsSize.y > 0 ? (cellHeight * padding) / boundsSize.y : 1;
+    const scale = Math.min(scaleX, scaleY);
+
     skeleton.scaleX = scale;
     skeleton.scaleY = scale;
     skeleton.updateWorldTransform(Physics.update);
@@ -107,18 +130,38 @@ function layoutInstances(
 export async function runPlaybackBenchmark(
   options: PlaybackBenchmarkOptions,
 ): Promise<PlaybackBenchmarkResult> {
-  const { canvas, format, instanceCount, animationName, durationSec } = options;
+  const { canvas, format, instanceCount, animationGroupId, durationSec } =
+    options;
+  const group = getAnimationGroup(animationGroupId);
+  if (group.entries.length === 0) {
+    throw new Error(
+      `В группе ${animationGroupId} нет скелетов с ${animationGroupId}-й анимацией`,
+    );
+  }
 
-  const assets = await loadAssetsForPlayback(canvas, format);
-  const skeletonData = parseSkeletonData(assets, format);
+  const animationName = formatAnimationGroupLabel(group);
+  const context = new ManagedWebGLRenderingContext(canvas);
+  const assets = await loadAssetsForPlayback(context, format, animationGroupId);
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+  const specs: SkeletonPlaybackSpec[] = getSkeletonsForGroup(animationGroupId).map(
+    ({ skeleton, animationName: skeletonAnimation }) => {
+      const loaded = assetsById.get(skeleton.id);
+      if (!loaded) {
+        throw new Error(`Loaded assets missing for ${skeleton.id}`);
+      }
+      return {
+        skeletonData: parseSkeletonData(loaded, format),
+        animationName: skeletonAnimation,
+      };
+    },
+  );
+
   const instanceCreateBenchmark = benchmarkCreateRuntimeInstances(
-    skeletonData,
-    animationName,
+    specs,
     instanceCount,
   );
   const instances = instanceCreateBenchmark.instances;
 
-  const context = new ManagedWebGLRenderingContext(canvas);
   const renderer = new SceneRenderer(canvas, context);
   const gl = context.gl;
   renderer.resize(ResizeMode.Expand);
@@ -158,10 +201,13 @@ export async function runPlaybackBenchmark(
   }
 
   const stats = summarizeFrameTimes(frameTimesMs);
+  const totalInstances = instances.length;
 
   return {
     format,
-    instanceCount,
+    instanceCount: totalInstances,
+    skeletonCount: group.entries.length,
+    animationGroupId,
     animationName,
     durationSec,
     totalFrames: frameTimesMs.length,
@@ -171,7 +217,9 @@ export async function runPlaybackBenchmark(
     frameTimeP95Ms: stats.frameTimeP95Ms,
     instanceCreate: {
       format,
-      instanceCount,
+      instanceCount: totalInstances,
+      skeletonCount: group.entries.length,
+      animationGroupId,
       animationName,
       totalCreateMs: instanceCreateBenchmark.totalCreateMs,
       avgCreateMs: instanceCreateBenchmark.avgCreateMs,

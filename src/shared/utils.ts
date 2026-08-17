@@ -8,9 +8,48 @@ import {
   SkeletonData,
   SkeletonJson,
   TextureAtlas,
+  TextureAtlasRegion,
 } from "@esotericsoftware/spine-core";
-import type { SkeletonFormat } from "../types";
+import { spineAssetsConfig } from "./spineConfig";
+import type { SkeletonFormat, SpineSkeletonConfig } from "../types";
 import { estimateDroppedFrames } from "./metrics";
+
+const atlasesWithMissingRegionStub = new WeakSet<TextureAtlas>();
+
+function stubMissingAtlasRegion(atlas: TextureAtlas, name: string): TextureAtlasRegion {
+  const page = atlas.pages[0];
+  if (!page) {
+    throw new Error(`Atlas has no pages; cannot stub region ${name}`);
+  }
+
+  const region = new TextureAtlasRegion(page, name);
+  region.width = 1;
+  region.height = 1;
+  region.originalWidth = 1;
+  region.originalHeight = 1;
+  region.u = 0;
+  region.v = 0;
+  region.u2 = page.width > 0 ? 1 / page.width : 1;
+  region.v2 = page.height > 0 ? 1 / page.height : 1;
+  atlas.regions.push(region);
+  return region;
+}
+
+function allowMissingAtlasRegions(atlas: TextureAtlas): void {
+  if (atlasesWithMissingRegionStub.has(atlas)) {
+    return;
+  }
+
+  atlasesWithMissingRegionStub.add(atlas);
+  const originalFindRegion = atlas.findRegion.bind(atlas);
+  atlas.findRegion = (name: string) => {
+    const region = originalFindRegion(name);
+    if (region) {
+      return region;
+    }
+    return stubMissingAtlasRegion(atlas, name);
+  };
+}
 
 export interface LoadedSpineAssets {
   atlas: TextureAtlas;
@@ -19,58 +58,90 @@ export interface LoadedSpineAssets {
   fileSizeBytes: number;
 }
 
+export interface LoadedSpineAsset extends LoadedSpineAssets {
+  id: string;
+}
+
+const ASSETS_BASE = spineAssetsConfig.assetsRoot;
+
+async function fetchAsset(path: string): Promise<Response> {
+  const response = await fetch(`${ASSETS_BASE}${path}`);
+  if (!response.ok) {
+    throw new Error(`Failed to load ${path} (${response.status})`);
+  }
+  return response;
+}
+
+async function loadAtlasMap(
+  skeletons: SpineSkeletonConfig[],
+): Promise<Map<string, TextureAtlas>> {
+  const uniqueAtlasPaths = [...new Set(skeletons.map((item) => item.atlasPath))];
+  const atlasEntries = await Promise.all(
+    uniqueAtlasPaths.map(async (atlasPath) => {
+      const atlasText = await (await fetchAsset(atlasPath)).text();
+      return [atlasPath, new TextureAtlas(atlasText)] as const;
+    }),
+  );
+  return new Map(atlasEntries);
+}
+
 export async function loadSpineAssets(
   format: SkeletonFormat,
-): Promise<LoadedSpineAssets> {
-  const [atlasResponse, skeletonResponse] = await Promise.all([
-    fetch("/assets/symbols.atlas"),
-    fetch(
-      format === "json"
-        ? "/assets/animation.json"
-        : "/assets/animation.skel",
-    ),
-  ]);
+  skeletons: SpineSkeletonConfig[] = spineAssetsConfig.skeletons,
+): Promise<LoadedSpineAsset[]> {
+  const atlasMap = await loadAtlasMap(skeletons);
 
-  if (!atlasResponse.ok || !skeletonResponse.ok) {
-    throw new Error(`Failed to load assets for ${format}`);
-  }
+  return Promise.all(
+    skeletons.map(async (skeleton) => {
+      const atlas = atlasMap.get(skeleton.atlasPath);
+      if (!atlas) {
+        throw new Error(`Atlas not loaded: ${skeleton.atlasPath}`);
+      }
 
-  const atlasText = await atlasResponse.text();
-  const atlas = new TextureAtlas(atlasText);
+      if (format === "json") {
+        const skeletonText = await (await fetchAsset(skeleton.jsonPath)).text();
+        return {
+          id: skeleton.id,
+          atlas,
+          skeletonBytes: new Uint8Array(),
+          skeletonText,
+          fileSizeBytes: new TextEncoder().encode(skeletonText).length,
+        };
+      }
 
-  if (format === "json") {
-    const skeletonText = await skeletonResponse.text();
-    return {
-      atlas,
-      skeletonBytes: new Uint8Array(),
-      skeletonText,
-      fileSizeBytes: new TextEncoder().encode(skeletonText).length,
-    };
-  }
-
-  const skeletonBuffer = await skeletonResponse.arrayBuffer();
-  const skeletonBytes = new Uint8Array(skeletonBuffer);
-  return {
-    atlas,
-    skeletonBytes,
-    skeletonText: "",
-    fileSizeBytes: skeletonBytes.byteLength,
-  };
+      const skeletonBuffer = await (await fetchAsset(skeleton.skelPath)).arrayBuffer();
+      const skeletonBytes = new Uint8Array(skeletonBuffer);
+      return {
+        id: skeleton.id,
+        atlas,
+        skeletonBytes,
+        skeletonText: "",
+        fileSizeBytes: skeletonBytes.byteLength,
+      };
+    }),
+  );
 }
 
 export function parseSkeletonData(
   assets: LoadedSpineAssets,
   format: SkeletonFormat,
 ): SkeletonData {
+  allowMissingAtlasRegions(assets.atlas);
   const attachmentLoader = new AtlasAttachmentLoader(assets.atlas);
+  const skeletonId = "id" in assets ? String(assets.id) : "skeleton";
 
-  if (format === "json") {
-    const skeletonJson = new SkeletonJson(attachmentLoader);
-    return skeletonJson.readSkeletonData(assets.skeletonText);
+  try {
+    if (format === "json") {
+      const skeletonJson = new SkeletonJson(attachmentLoader);
+      return skeletonJson.readSkeletonData(assets.skeletonText);
+    }
+
+    const skeletonBinary = new SkeletonBinary(attachmentLoader);
+    return skeletonBinary.readSkeletonData(assets.skeletonBytes);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse ${skeletonId} (${format}): ${message}`);
   }
-
-  const skeletonBinary = new SkeletonBinary(attachmentLoader);
-  return skeletonBinary.readSkeletonData(assets.skeletonBytes);
 }
 
 export interface ParseSampleAccumulator {
@@ -98,6 +169,10 @@ export function recordParseSample(
   acc.longestFrameGapMs = Math.max(acc.longestFrameGapMs, duration);
 }
 
+export function totalFileSizeBytes(assets: LoadedSpineAsset[]): number {
+  return assets.reduce((sum, item) => sum + item.fileSizeBytes, 0);
+}
+
 export interface RuntimeInstance {
   skeleton: Skeleton;
   animationState: AnimationState;
@@ -114,6 +189,11 @@ export function createRuntimeInstance(
   return { skeleton, animationState };
 }
 
+export interface SkeletonPlaybackSpec {
+  skeletonData: SkeletonData;
+  animationName: string;
+}
+
 export interface CreateRuntimeInstancesBenchmark {
   instances: RuntimeInstance[];
   totalCreateMs: number;
@@ -125,13 +205,18 @@ export interface CreateRuntimeInstancesBenchmark {
 }
 
 export function benchmarkCreateRuntimeInstances(
-  skeletonData: SkeletonData,
-  animationName: string,
-  instanceCount: number,
-  warmupCount = 3,
+  specs: SkeletonPlaybackSpec[],
+  copiesPerSkeleton: number,
+  warmupCount = 1,
 ): CreateRuntimeInstancesBenchmark {
-  for (let index = 0; index < warmupCount; index += 1) {
-    createRuntimeInstance(skeletonData, animationName);
+  if (specs.length === 0) {
+    throw new Error("No skeletons to instantiate");
+  }
+
+  for (let warmupIndex = 0; warmupIndex < warmupCount; warmupIndex += 1) {
+    for (const spec of specs) {
+      createRuntimeInstance(spec.skeletonData, spec.animationName);
+    }
   }
 
   const createDurations: number[] = [];
@@ -139,15 +224,19 @@ export function benchmarkCreateRuntimeInstances(
   let longestFrameGapMs = 0;
   const instances: RuntimeInstance[] = [];
 
-  for (let index = 0; index < instanceCount; index += 1) {
-    const startedAt = performance.now();
-    instances.push(createRuntimeInstance(skeletonData, animationName));
-    const endedAt = performance.now();
-    const duration = endedAt - startedAt;
-    createDurations.push(duration);
+  for (let copyIndex = 0; copyIndex < copiesPerSkeleton; copyIndex += 1) {
+    for (const spec of specs) {
+      const startedAt = performance.now();
+      instances.push(
+        createRuntimeInstance(spec.skeletonData, spec.animationName),
+      );
+      const endedAt = performance.now();
+      const duration = endedAt - startedAt;
+      createDurations.push(duration);
 
-    droppedFramesDuringCreate += estimateDroppedFrames(duration);
-    longestFrameGapMs = Math.max(longestFrameGapMs, duration);
+      droppedFramesDuringCreate += estimateDroppedFrames(duration);
+      longestFrameGapMs = Math.max(longestFrameGapMs, duration);
+    }
   }
 
   const totalCreateMs = createDurations.reduce((sum, value) => sum + value, 0);
@@ -155,7 +244,7 @@ export function benchmarkCreateRuntimeInstances(
   return {
     instances,
     totalCreateMs,
-    avgCreateMs: totalCreateMs / instanceCount,
+    avgCreateMs: totalCreateMs / createDurations.length,
     minCreateMs: Math.min(...createDurations),
     maxCreateMs: Math.max(...createDurations),
     droppedFramesDuringCreate,

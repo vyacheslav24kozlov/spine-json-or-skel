@@ -1,20 +1,28 @@
 import { TextureAtlas } from "@esotericsoftware/spine-core";
-import type { ParseBenchmarkResult, SkeletonFormat } from "../types";
+import type {
+  ParseBenchmarkResult,
+  SkeletonFormat,
+  SpineSkeletonConfig,
+} from "../types";
+import { spineAssetsConfig } from "./spineConfig";
 import {
   parseSkeletonData,
   recordParseSample,
-  type LoadedSpineAssets,
+  totalFileSizeBytes,
+  type LoadedSpineAsset,
   type ParseSampleAccumulator,
 } from "./utils";
 
 export function runParseBenchmarkNode(
-  assets: LoadedSpineAssets,
+  assets: LoadedSpineAsset[],
   format: SkeletonFormat,
   instanceCount: number,
   warmupCount = 5,
 ): ParseBenchmarkResult {
   for (let index = 0; index < warmupCount; index += 1) {
-    parseSkeletonData(assets, format);
+    for (const asset of assets) {
+      parseSkeletonData(asset, format);
+    }
   }
 
   const acc: ParseSampleAccumulator = {
@@ -23,8 +31,10 @@ export function runParseBenchmarkNode(
     longestFrameGapMs: 0,
   };
 
-  for (let index = 0; index < instanceCount; index += 1) {
-    recordParseSample(assets, format, acc);
+  for (let round = 0; round < instanceCount; round += 1) {
+    for (const asset of assets) {
+      recordParseSample(asset, format, acc);
+    }
   }
 
   const totalParseMs = acc.durations.reduce((sum, value) => sum + value, 0);
@@ -32,9 +42,10 @@ export function runParseBenchmarkNode(
   return {
     format,
     instanceCount,
-    fileSizeBytes: assets.fileSizeBytes,
+    skeletonCount: assets.length,
+    fileSizeBytes: totalFileSizeBytes(assets),
     totalParseMs,
-    avgParseMs: totalParseMs / instanceCount,
+    avgParseMs: totalParseMs / acc.durations.length,
     minParseMs: Math.min(...acc.durations),
     maxParseMs: Math.max(...acc.durations),
     droppedFramesDuringParse: acc.droppedFrames,
@@ -45,36 +56,51 @@ export function runParseBenchmarkNode(
 export async function loadSpineAssetsFromDisk(
   format: SkeletonFormat,
   assetsDir: string,
-): Promise<LoadedSpineAssets> {
+  skeletons: SpineSkeletonConfig[] = spineAssetsConfig.skeletons,
+): Promise<LoadedSpineAsset[]> {
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
 
-  const atlasText = await fs.readFile(
-    path.join(assetsDir, "symbols.atlas"),
-    "utf8",
-  );
-  const atlas = new TextureAtlas(atlasText);
+  const atlasCache = new Map<string, TextureAtlas>();
+  const assets: LoadedSpineAsset[] = [];
 
-  if (format === "json") {
-    const skeletonText = await fs.readFile(
-      path.join(assetsDir, "animation.json"),
-      "utf8",
+  for (const skeleton of skeletons) {
+    let atlas = atlasCache.get(skeleton.atlasPath);
+    if (!atlas) {
+      const atlasText = await fs.readFile(
+        path.join(assetsDir, skeleton.atlasPath),
+        "utf8",
+      );
+      atlas = new TextureAtlas(atlasText);
+      atlasCache.set(skeleton.atlasPath, atlas);
+    }
+
+    if (format === "json") {
+      const skeletonText = await fs.readFile(
+        path.join(assetsDir, skeleton.jsonPath),
+        "utf8",
+      );
+      assets.push({
+        id: skeleton.id,
+        atlas,
+        skeletonBytes: new Uint8Array(),
+        skeletonText,
+        fileSizeBytes: Buffer.byteLength(skeletonText, "utf8"),
+      });
+      continue;
+    }
+
+    const skeletonBytes = new Uint8Array(
+      await fs.readFile(path.join(assetsDir, skeleton.skelPath)),
     );
-    return {
+    assets.push({
+      id: skeleton.id,
       atlas,
-      skeletonBytes: new Uint8Array(),
-      skeletonText,
-      fileSizeBytes: Buffer.byteLength(skeletonText, "utf8"),
-    };
+      skeletonBytes,
+      skeletonText: "",
+      fileSizeBytes: skeletonBytes.byteLength,
+    });
   }
 
-  const skeletonBytes = new Uint8Array(
-    await fs.readFile(path.join(assetsDir, "animation.skel")),
-  );
-  return {
-    atlas,
-    skeletonBytes,
-    skeletonText: "",
-    fileSizeBytes: skeletonBytes.byteLength,
-  };
+  return assets;
 }
