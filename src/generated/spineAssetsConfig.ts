@@ -5,7 +5,7 @@
 import type { SpineAssetsConfig } from "../types";
 
 export const spineAssetsConfig: SpineAssetsConfig = {
-  "generatedAt": "2026-08-17T13:32:52.207Z",
+  "generatedAt": "2026-08-17T14:14:16.479Z",
   "assetsRoot": "/assets/",
   "skeletons": [
     {
@@ -168,15 +168,6 @@ export const spineAssetsConfig: SpineAssetsConfig = {
         "knife3_fly",
         "knife3_stop",
         "win"
-      ]
-    },
-    {
-      "id": "game_elements/reelsborder",
-      "jsonPath": "game_elements/reelsborder.json",
-      "skelPath": "game_elements/reelsborder.skel",
-      "atlasPath": "game_elements/game_elements.atlas",
-      "animations": [
-        "animation"
       ]
     },
     {
@@ -373,10 +364,6 @@ export const spineAssetsConfig: SpineAssetsConfig = {
         {
           "skeletonId": "game_elements/knife_target_gl",
           "animationName": "knife1_fly"
-        },
-        {
-          "skeletonId": "game_elements/reelsborder",
-          "animationName": "animation"
         },
         {
           "skeletonId": "game_elements/reelsbox_bonus",
