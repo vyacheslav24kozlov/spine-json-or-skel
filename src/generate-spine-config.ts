@@ -7,6 +7,7 @@ import {
   type SpineAssetsConfig,
   type SpineSkeletonConfig,
 } from "./types";
+import { listFilesRecursive, toAssetPath } from "./shared/utils";
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ASSETS_DIR = path.join(ROOT_DIR, "public", "assets");
@@ -20,24 +21,6 @@ const OUTPUT_PATH = path.join(
 interface SpineJsonDocument {
   skeleton?: unknown;
   animations?: Record<string, unknown>;
-}
-
-function toAssetPath(absolutePath: string): string {
-  return path.relative(ASSETS_DIR, absolutePath).split(path.sep).join("/");
-}
-
-async function listFilesRecursive(dir: string): Promise<string[]> {
-  const entries = await fs.readdir(dir, { withFileTypes: true });
-  const files = await Promise.all(
-    entries.map(async (entry) => {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        return listFilesRecursive(fullPath);
-      }
-      return [fullPath];
-    }),
-  );
-  return files.flat();
 }
 
 function collectByExtension(files: string[], extension: string): Set<string> {
@@ -54,19 +37,19 @@ function resolveAtlasPath(
   const stem = path.basename(jsonPath, ".json");
   const ownAtlas = path.join(dir, `${stem}.atlas`);
   if (atlasFiles.has(ownAtlas)) {
-    return toAssetPath(ownAtlas);
+    return toAssetPath(ASSETS_DIR, ownAtlas);
   }
 
   const atlasesInDir = [...atlasFiles].filter(
     (atlasPath) => path.dirname(atlasPath) === dir,
   );
   if (atlasesInDir.length === 1) {
-    return toAssetPath(atlasesInDir[0]);
+    return toAssetPath(ASSETS_DIR, atlasesInDir[0]);
   }
 
   const folderAtlas = path.join(dir, `${path.basename(dir)}.atlas`);
   if (atlasFiles.has(folderAtlas)) {
-    return toAssetPath(folderAtlas);
+    return toAssetPath(ASSETS_DIR, folderAtlas);
   }
 
   return null;
@@ -79,12 +62,12 @@ async function readAnimationNames(jsonPath: string): Promise<string[] | null> {
     document = JSON.parse(raw) as SpineJsonDocument;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn(`Skip ${toAssetPath(jsonPath)}: invalid JSON (${message})`);
+    console.warn(`Skip ${toAssetPath(ASSETS_DIR, jsonPath)}: invalid JSON (${message})`);
     return null;
   }
 
   if (!document.skeleton || !document.animations) {
-    console.warn(`Skip ${toAssetPath(jsonPath)}: not a Spine skeleton JSON`);
+    console.warn(`Skip ${toAssetPath(ASSETS_DIR, jsonPath)}: not a Spine skeleton JSON`);
     return null;
   }
 
@@ -117,26 +100,26 @@ async function collectSkeletons(): Promise<SpineSkeletonConfig[]> {
   for (const jsonPath of jsonFiles) {
     const skelPath = jsonPath.slice(0, -".json".length) + ".skel";
     if (!skelFiles.has(skelPath)) {
-      console.warn(`Skip ${toAssetPath(jsonPath)}: missing paired .skel`);
+      console.warn(`Skip ${toAssetPath(ASSETS_DIR, jsonPath)}: missing paired .skel`);
       continue;
     }
 
     const atlasPath = resolveAtlasPath(jsonPath, atlasFiles);
     if (!atlasPath) {
-      console.warn(`Skip ${toAssetPath(jsonPath)}: atlas not found`);
+      console.warn(`Skip ${toAssetPath(ASSETS_DIR, jsonPath)}: atlas not found`);
       continue;
     }
 
     const animations = await readAnimationNames(jsonPath);
     if (!animations || animations.length === 0) {
-      console.warn(`Skip ${toAssetPath(jsonPath)}: no animations`);
+      console.warn(`Skip ${toAssetPath(ASSETS_DIR, jsonPath)}: no animations`);
       continue;
     }
 
     skeletons.push({
-      id: toAssetPath(jsonPath).replace(/\.json$/i, ""),
-      jsonPath: toAssetPath(jsonPath),
-      skelPath: toAssetPath(skelPath),
+      id: toAssetPath(ASSETS_DIR, jsonPath).replace(/\.json$/i, ""),
+      jsonPath: toAssetPath(ASSETS_DIR, jsonPath),
+      skelPath: toAssetPath(ASSETS_DIR, skelPath),
       atlasPath,
       animations,
     });

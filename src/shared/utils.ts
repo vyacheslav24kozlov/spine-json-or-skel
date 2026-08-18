@@ -13,6 +13,8 @@ import {
 import { spineAssetsConfig } from "./spineConfig";
 import type { SkeletonFormat, SpineSkeletonConfig } from "../types";
 import { estimateDroppedFrames } from "./metrics";
+import path from "node:path";
+import fs from "node:fs/promises";
 
 const atlasesWithMissingRegionStub = new WeakSet<TextureAtlas>();
 
@@ -259,4 +261,24 @@ export function updateRuntimeInstance(
   instance.animationState.update(deltaSec);
   instance.animationState.apply(instance.skeleton);
   instance.skeleton.updateWorldTransform(Physics.update);
+}
+
+/* CLI SCRIPT */
+
+export function toAssetPath(assetsDir: string, absolutePath: string): string {
+  return path.relative(assetsDir, absolutePath).split(path.sep).join("/");
+}
+
+export async function listFilesRecursive(dir: string): Promise<string[]> {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        return listFilesRecursive(fullPath);
+      }
+      return [fullPath];
+    }),
+  );
+  return files.flat();
 }
