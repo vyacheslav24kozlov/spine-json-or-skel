@@ -5,7 +5,7 @@
 import type { SpineAssetsConfig } from "../types";
 
 export const spineAssetsConfig: SpineAssetsConfig = {
-  "generatedAt": "2026-08-17T14:14:16.479Z",
+  "generatedAt": "2026-08-18T13:00:40.050Z",
   "assetsRoot": "/assets/",
   "skeletons": [
     {
